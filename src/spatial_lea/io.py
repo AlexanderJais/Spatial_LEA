@@ -33,7 +33,17 @@ CONTROL_TYPES = (
 
 # section -> animal, and the study design.  Kept here so a loaded object always
 # carries its group labels and can never be analysed with them detached.
-SECTION_ANIMAL = {"F536_1": "F536", "G073_2": "G_073", "M399_3": "M399", "M493_2": "M493"}
+SECTION_ANIMAL = {
+    "F536_1": "F536", "F536_2": "F536", "F536_3": "F536",
+    "G073_1": "G_073", "G073_2": "G_073", "G073_3": "G_073",
+    "M399_1": "M399", "M399_2": "M399", "M399_3": "M399",
+    "M493_1": "M493", "M493_2": "M493", "M493_3": "M493",
+}
+# The four sections with a hand-drawn ROI; kept only to reproduce the original
+# analysis and to validate the anatomical frame against it.
+ROI_SECTIONS = ("F536_1", "G073_2", "M399_3", "M493_2")
+# Flagged by the lab as physically distorted; analysed but reported separately.
+SUSPECT_SECTIONS = ("M399_2",)
 ANIMAL_META = {
     "F536": {"age_group": "aged", "age_weeks": 70, "batch": "B1", "sex": "male"},
     "M493": {"age_group": "adult", "age_weeks": 29, "batch": "B1", "sex": "male"},
@@ -42,10 +52,25 @@ ANIMAL_META = {
 }
 
 
+def _read_matrix(folder: Path) -> ad.AnnData:
+    """Read the count matrix, whichever form the bundle shipped it in.
+
+    Most sections carry ``cell_feature_matrix.h5``; a few carry only the mtx
+    trio in ``cell_feature_matrix/``.
+    """
+    h5 = folder / "cell_feature_matrix.h5"
+    if h5.exists():
+        return sc.read_10x_h5(h5, gex_only=False)
+    mtx_dir = folder / "cell_feature_matrix"
+    if (mtx_dir / "matrix.mtx.gz").exists():
+        return sc.read_10x_mtx(mtx_dir, gex_only=False, make_unique=False)
+    raise FileNotFoundError(f"{folder}: no cell_feature_matrix.h5 and no mtx directory")
+
+
 def load_section(section: str, raw: Path = RAW, roi_file: Path = ROI_FILE) -> ad.AnnData:
     """Load one section: counts, cell metadata, design labels and ROI mask."""
     folder = raw / section
-    adata = sc.read_10x_h5(folder / "cell_feature_matrix.h5", gex_only=False)
+    adata = _read_matrix(folder)
     adata.var_names_make_unique()
 
     cells = pd.read_parquet(folder / "cells.parquet").set_index("cell_id")
@@ -62,15 +87,20 @@ def load_section(section: str, raw: Path = RAW, roi_file: Path = ROI_FILE) -> ad
     for key, value in ANIMAL_META[animal].items():
         adata.obs[key] = pd.Categorical([value] * adata.n_obs)
 
+    # Only four sections were hand-drawn; the rest rely on the anatomical frame
+    # (spatial_lea.anatomy), so a missing ROI is normal, not an error.
     rois = load_rois(roi_file)
-    roi = rois[section]
-    adata.obs["in_roi"] = cells_in_roi(adata.obs, roi)
-    adata.obs[["roi_x", "roi_y"]] = roi_display_coords(adata.obs, roi)
-    adata.uns["roi"] = {
-        "name": roi.roi_name,
-        "rotation_deg": roi.rotation_deg,
-        "n_cells_expected": roi.n_cells_expected,
-    }
+    roi = rois.get(section)
+    if roi is not None:
+        adata.obs["in_roi"] = cells_in_roi(adata.obs, roi)
+        adata.obs[["roi_x", "roi_y"]] = roi_display_coords(adata.obs, roi)
+        adata.uns["roi"] = {
+            "name": roi.roi_name,
+            "rotation_deg": roi.rotation_deg,
+            "n_cells_expected": roi.n_cells_expected,
+        }
+    else:
+        adata.obs["in_roi"] = False
 
     _split_controls(adata)
     return adata

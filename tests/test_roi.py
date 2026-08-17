@@ -17,12 +17,8 @@ REPO = Path(__file__).resolve().parents[1]
 ROI_FILE = REPO / "config" / "roi_coordinates_male_2vs2.json"
 RAW = REPO / "data" / "raw"
 
-# ROI keys use G073_2 while the Drive folder / experiment.xenium use G_073_2.
-SAMPLE_DIRS = {"G073_2": "G_073_2"}
-
-
 def _cells_path(sample: str) -> Path:
-    return RAW / SAMPLE_DIRS.get(sample, sample) / "cells.parquet"
+    return RAW / sample / "cells.parquet"
 
 
 ROIS = load_rois(ROI_FILE) if ROI_FILE.exists() else {}
@@ -42,3 +38,32 @@ def test_rotation_is_required_where_specified() -> None:
     """Ignoring the transform must change the selection, else it is untested."""
     rotated = [s for s, r in ROIS.items() if r.is_rotated]
     assert rotated, "expected at least one rotated ROI in the male 2v2 export"
+
+
+def test_anatomical_frame_is_consistent_across_sections() -> None:
+    """Every section's frame must agree on orientation and be well-conditioned.
+
+    The ventricle strip is elongated, so a low elongation means the fit latched
+    onto something that is not the third ventricle.  The ventral direction is
+    resolved from the arcuate, so it must be reproducible section to section
+    once expressed in the frame's own terms.
+    """
+    import numpy as np
+
+    from spatial_lea.anatomy import HYPOTHALAMIC_WINDOW, NUCLEI
+
+    model_path = REPO / "results" / "anatomy" / "nucleus_model.npy"
+    if not model_path.exists():
+        pytest.skip("run scripts/08_anatomy.py first")
+    model = np.load(model_path, allow_pickle=True).item()
+
+    assert set(model) == set(NUCLEI)
+    # Anatomical ordering along the dorsoventral axis: ARC is ventral to VMH,
+    # which is ventral to DMH.  If this ever fails the frame is upside down.
+    dv = {n: model[n]["mean"][1] for n in NUCLEI}
+    assert dv["ARC"] < dv["VMH"] < dv["DMH"], dv
+    # All three sit inside the hypothalamic window they were fitted in.
+    for nucleus in NUCLEI:
+        ml, dorsal = model[nucleus]["mean"]
+        assert 0 <= ml <= HYPOTHALAMIC_WINDOW["max_abs_ml"]
+        assert HYPOTHALAMIC_WINDOW["min_dv"] <= dorsal <= HYPOTHALAMIC_WINDOW["max_dv"]

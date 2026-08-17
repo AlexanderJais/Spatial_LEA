@@ -37,6 +37,10 @@ FOLDER_MIME = "application/vnd.google-apps.folder"
 # is only used for re-segmentation, so it is excluded unless --all is given.
 CORE_FILES = {
     "cell_feature_matrix.h5",
+    # Some sections ship the matrix only as the mtx trio, with no .h5.
+    "barcodes.tsv.gz",
+    "matrix.mtx.gz",
+    "features.tsv.gz",
     "cells.parquet",
     "nucleus_boundaries.parquet",
     "cell_boundaries.parquet",
@@ -104,6 +108,30 @@ def walk(folder_id: str, prefix: str = "", depth: int = 0, max_depth: int = 3) -
     return out
 
 
+# Sections live either at the root or one level down under "additional slides",
+# and each may nest files inside cell_feature_matrix/ or morphology_focus/.
+# Both are flattened to data/raw/<section>/ so downstream code sees one layout.
+SUBDIRS = {"cell_feature_matrix", "morphology_focus"}
+CONTAINER_DIRS = {"additional slides"}
+
+
+def _section_of(path: str) -> str:
+    parts = [p for p in path.split("/") if p and p not in CONTAINER_DIRS]
+    parts = [p for p in parts if p not in SUBDIRS]
+    return parts[-2] if len(parts) >= 2 else "_root"
+
+
+def _local_path(path: str) -> Path:
+    section = _section_of(path)
+    name = path.split("/")[-1]
+    # Keep the mtx trio together so scanpy can read the directory directly.
+    if name in {"barcodes.tsv.gz", "matrix.mtx.gz"} or (
+        name == "features.tsv.gz" and "cell_feature_matrix" in path
+    ):
+        return Path(section) / "cell_feature_matrix" / name
+    return Path(section) / name if section != "_root" else Path(name)
+
+
 def download(file_id: str, dest: Path) -> bool:
     if dest.exists() and dest.stat().st_size > 0:
         print(f"  skip   {dest.name} (present)")
@@ -127,7 +155,8 @@ def main() -> int:
     parser.add_argument("--sections", nargs="*", help="section ids, default: all")
     parser.add_argument("--list-only", action="store_true", help="print the tree, download nothing")
     parser.add_argument("--all", action="store_true", help="also fetch transcripts.parquet (~0.5 GB/section)")
-    parser.add_argument("--max-depth", type=int, default=3)
+    parser.add_argument("--images", action="store_true", help="also fetch morphology_focus DAPI (~0.7 GB/section)")
+    parser.add_argument("--max-depth", type=int, default=4)
     args = parser.parse_args()
 
     tree = walk(ROOT_FOLDER, max_depth=args.max_depth)
@@ -143,6 +172,8 @@ def main() -> int:
     wanted = set(CORE_FILES)
     if args.all:
         wanted.add("transcripts.parquet")
+    if args.images:
+        wanted.add("morphology_focus_0000.ome.tif")
 
     files = [
         e
@@ -153,11 +184,11 @@ def main() -> int:
     ]
     failures = []
     for entry in sorted(files, key=lambda e: e["path"]):
-        section = entry["path"].split("/")[-2] if "/" in entry["path"] else "_root"
+        section = _section_of(entry["path"])
         if args.sections and section not in args.sections:
             continue
-        print(section)
-        if not download(entry["id"], RAW / Path(entry["path"])):
+        print(f"{section}/{entry['name']}")
+        if not download(entry["id"], RAW / _local_path(entry["path"])):
             failures.append(entry["path"])
 
     if failures:
