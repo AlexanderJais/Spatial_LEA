@@ -164,140 +164,130 @@
 <div class="wrap">
 
   <header>
-    <div class="eyebrow">Analysis plan &middot; Xenium spatial transcriptomics</div>
+    <div class="eyebrow">Findings &middot; Xenium spatial transcriptomics &middot; cohort A</div>
     <h1>Galanin receptor signalling in the ageing mediobasal hypothalamus</h1>
-    <p class="lede">Which MBH cell types change their <span class="gene gene-hit">Galr1</span> expression between mature adult and middle-aged male mice — and is the change confined to particular nuclei, such as the DMH?</p>
+    <p class="lede">A 32-type MBH cell atlas with <span class="gene gene-hit">Galr1</span> measured 23–30&times; above background — and, at 2 aged vs 2 adult, no systematic age difference in the receptor. The ligand moves more than the receptor does.</p>
     <div class="meta">
-      <span>4 animals &middot; 2 aged / 2 adult</span>
+      <span>4 male mice &middot; 2 aged (15–16 mo) / 2 adult (7 mo)</span>
+      <span>40,783 QC-passing MBH cells</span>
       <span>297-gene mBrain panel</span>
-      <span>40,863 MBH cells</span>
       <span>17 Aug 2026</span>
     </div>
   </header>
 
   <section>
     <div class="card card-hold">
-      <span class="chip chip-hold">Blocked — one file type missing</span>
-      <h2>The expression matrix is not in the shared folder</h2>
-      <p>All 14 sample folders contain exactly three files: <code>cells.parquet</code>, <code>features.tsv.gz</code> and <code>experiment.xenium</code>. <code>cells.parquet</code> holds <em>per-cell transcript totals</em> — not per-gene counts.</p>
-      <p>Galr1 cannot be measured and cell types cannot be called without <code>cell_feature_matrix.h5</code> (≈50–150&nbsp;MB per section, ≈1.5&nbsp;GB for all 14). Dropping it into the existing Drive folders is enough; the fetch script picks up whatever is present.</p>
+      <span class="chip chip-hold">Headline</span>
+      <h2>Galr1 does not change systematically with age in these animals</h2>
+      <p>Across 16 cell types with enough expressing cells to support a fold change, the two independent batches agree on the direction of the Galr1 age effect in <strong>8 of 16</strong> (detection rate) and <strong>10 of 16</strong> (expression level). That is what two coin flips give — binomial p = 0.60 and 0.23. Nothing in <span class="gene">Galr1</span> or <span class="gene">Galr3</span> survives a shortlist of "consistent in both blocks and at least 1.5&times; in the weaker block".</p>
+      <p>This is a real result, not a failed measurement: Galr1 is detected in 15–19% of cells at 23–30&times; the strongest negative-control probe, and the atlas is clean. The age contrast simply is not there at this sample size.</p>
     </div>
   </section>
 
   <section>
-    <div class="eyebrow">Already settled</div>
-    <h2>Three things verified directly against the data</h2>
+    <div class="eyebrow">What did hold up</div>
+    <h2>Three findings worth carrying forward</h2>
     <div class="grid-3">
       <div class="tile">
-        <span class="label">Panel</span>
-        <p><strong>Galr1 and Galr3 are on the panel</strong>, together with the ligand <span class="gene">Gal</span>. <span class="gene">Galr2</span> is absent. The question is answerable — and a ligand–receptor story is available, not just a receptor count.</p>
+        <span class="label">Lead 1 · receptor</span>
+        <p>The <strong>GABA Gal/Galr1 population</strong> — 1,705 cells, 53–67% Galr1⁺, with <span class="gene">Galr1</span> as a defining marker — is <strong>~22–24% lower in aged</strong>, consistent in both blocks and both metrics. The one Galr1 lead.</p>
       </div>
       <div class="tile">
-        <span class="label">Design</span>
-        <p><strong>Age is orthogonal to batch.</strong> Each run day carries one aged and one adult animal, so nothing needs deconfounding — the best-case outcome for a 2&nbsp;vs&nbsp;2 layout.</p>
+        <span class="label">Lead 2 · ligand</span>
+        <p><strong>Tanycyte <span class="gene">Gal</span> falls ~2&times; in aged</strong> (LFC −0.87 / −0.89 detection; −0.67 / −1.35 expression). The tightest, most reproducible effect in the whole analysis.</p>
       </div>
       <div class="tile">
-        <span class="label">ROI</span>
-        <p><strong>The transform convention is solved exactly.</strong> Rotating centroids by <code>+rotation_deg</code> about the pivot reproduces every recorded cell count with zero error.</p>
+        <span class="label">Lead 3 · source shift</span>
+        <p><strong>ARC Agrp/Npy <span class="gene">Gal</span> rises ~1.8&times;</strong> in aged. Together with the tanycyte drop this points at a change in galanin <em>availability and source</em>, not receptor abundance.</p>
       </div>
+    </div>
+    <p style="font-size:.95rem;color:var(--ink-2)">A shift in where galanin comes from, with receptor levels broadly held constant, is a more mechanistic story than a receptor count — and it is testable directly with the spatial data.</p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <div class="eyebrow">Caveat that changes what can be claimed</div>
+    <h2>The DMH result is probably geometry, not biology</h2>
+    <p><span class="gene">DMH Grp/Ppp1r17</span> neurons look like a dramatic ageing phenotype — 1.57% and 1.22% of ROI cells in the aged animals versus 0.46% and 0.10% in the adults, consistent in both blocks, up to a 16&times; range. It should not be reported as one yet.</p>
+    <div class="scroll">
+      <table>
+        <caption>Populations informative about where each section was cut, as % of that section's ROI cells.</caption>
+        <thead><tr><th>Population</th><th>AP position</th><th>F536 aged</th><th>G_073 aged</th><th>M493 adult</th><th>M399 adult</th></tr></thead>
+        <tbody>
+          <tr><td>Oxt/Avp magnocellular</td><td>rostral</td><td class="num">0.33</td><td class="num">0.44</td><td class="num">0.54</td><td class="num">0.62</td></tr>
+          <tr><td>ARC Pomc</td><td>mid</td><td class="num">1.91</td><td class="num">2.37</td><td class="num">1.88</td><td class="num">1.96</td></tr>
+          <tr><td>VMH-like Rasgrf2</td><td>mid</td><td class="num">4.22</td><td class="num">5.74</td><td class="num">5.23</td><td class="num">5.41</td></tr>
+          <tr><td><strong>DMH Grp/Ppp1r17</strong></td><td>caudal</td><td class="num aged">1.57</td><td class="num aged">1.22</td><td class="num adult">0.46</td><td class="num adult">0.10</td></tr>
+          <tr><td><strong>LHA Hcrt</strong></td><td>caudal-lateral</td><td class="num aged">1.41</td><td class="num aged">1.38</td><td class="num adult">2.63</td><td class="num adult">2.61</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>If the aged sections were simply cut more caudally, DMH <em>and</em> Hcrt should both rise. DMH rises 16&times; while Hcrt <em>falls</em> — so this is not one clean cut-level shift but a mix of section plane and ROI placement. The hand-drawn rectangles differ in area by 40% (3.68–5.15 mm²), so how much DMH versus LHA each box captures is partly a drawing decision. Composition correlation is <strong>r = 0.934 within group versus 0.905 between</strong> — group differences barely exceed section-to-section noise.</p>
+    <div class="card">
+      <h3>The fix</h3>
+      <p style="font-size:.95rem">Assign every cell to an anatomical nucleus, then express abundance as a fraction of cells <em>within that nucleus</em> rather than within the ROI. That removes box geometry from the denominator entirely, and it is the only way to answer "is the effect in the DMH?" properly.</p>
     </div>
   </section>
 
   <hr class="rule">
 
   <section>
+    <div class="eyebrow">Foundations</div>
+    <h2>The atlas and the measurement are publication-grade</h2>
+    <div class="grid-3">
+      <div class="tile">
+        <span class="label">Data quality</span>
+        <p><strong>99.7–100% of ROI cells pass QC.</strong> Negative-control probe rate 0.012% of counts, no multinucleate segmentations, 201–269 median counts per cell.</p>
+      </div>
+      <div class="tile">
+        <span class="label">Atlas</span>
+        <p><strong>32 cell types, 16/16 canonical markers</strong> enriched in their assigned class; median animal-mixing entropy 0.99. All expected MBH populations recovered.</p>
+      </div>
+      <div class="tile">
+        <span class="label">Ageing signature</span>
+        <p><span class="gene">Gfap</span>, <span class="gene">Cd68</span>, <span class="gene">Trem2</span> up consistently in both blocks (+0.24 to +0.30 log2). Modest — as expected at 15–16 months.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <div class="eyebrow">Study design</div>
     <h2>A randomised complete block design</h2>
-    <p>Age is orthogonal to run day, slide and cassette. Each batch yields one independent aged−adult contrast, and agreement between the two blocks is the strongest evidence this design can produce.</p>
+    <p>Age is orthogonal to run day, slide and cassette — each batch carries one aged and one adult animal. Every effect above is estimated as a within-block fold change, one per batch, and the evidence is whether the two agree.</p>
     <div class="blocks">
       <div></div>
       <div class="hd">Aged</div>
       <div class="hd">Adult</div>
-
       <div class="rowlab">B1 · 26 Jun</div>
       <div class="cell cell-aged"><span class="id">F536</span><span class="ag">70 weeks · 16.1 mo</span></div>
       <div class="cell cell-adult"><span class="id">M493</span><span class="ag">29 weeks · 6.7 mo</span></div>
-
       <div class="rowlab">B2 · 01 Jul</div>
       <div class="cell cell-aged"><span class="id">G_073</span><span class="ag">65 weeks · 15.0 mo</span></div>
       <div class="cell cell-adult"><span class="id">M399</span><span class="ag">30 weeks · 6.9 mo</span></div>
     </div>
     <div class="card">
-      <h3>One framing caveat worth pre-empting</h3>
-      <p style="font-size:.95rem">By the NIA/JAX convention for C57BL/6 — adult 3–6&nbsp;mo, middle-aged 10–14&nbsp;mo, old 18–24&nbsp;mo — the two "aged" animals at 15.0 and 16.1 months are <strong>middle-aged</strong>. The contrast is real and hypothalamic ageing phenotypes do begin in middle age, but the ages should appear in the abstract and the claim be scoped to mid-life onset. An 18–24&nbsp;mo group later would turn the caveat into a trajectory.</p>
+      <h3>Two things to state plainly in the manuscript</h3>
+      <p style="font-size:.95rem">At 15.0 and 16.1 months the "aged" animals are <strong>middle-aged</strong> by the NIA convention, not old — put the ages in the abstract and scope the claim to mid-life onset.</p>
+      <p style="font-size:.95rem">With 2 vs 2 blocked, the exact permutation null has four label assignments, so <strong>the smallest attainable two-sided p-value is 0.5</strong> for any gene at any effect size. Everything above is reported as effect size and cross-block consistency; no p-value is claimed for a single cell type.</p>
     </div>
-  </section>
-
-  <section>
-    <div class="eyebrow">ROI validation</div>
-    <h2>Cell selection reproduces the recorded counts exactly</h2>
-    <div class="scroll">
-      <table>
-        <caption>Rotating centroids by +rotation_deg about the pivot, then applying the polygon. Alternative conventions do not match.</caption>
-        <thead><tr><th>Section</th><th>Rotation</th><th>Expected</th><th>No transform</th><th>+deg</th><th>−deg</th></tr></thead>
-        <tbody>
-          <tr><td class="num">M493_2</td><td class="num">+1.0°</td><td class="num">10,291</td><td class="num">10,287</td><td class="num" style="color:var(--ok);font-weight:600">10,291</td><td class="num">10,299</td></tr>
-          <tr><td class="num">F536_1</td><td class="num">—</td><td class="num">11,614</td><td class="num" style="color:var(--ok);font-weight:600">11,614</td><td class="num">—</td><td class="num">—</td></tr>
-          <tr><td class="num">G073_2</td><td class="num">—</td><td class="num">8,592</td><td class="num" style="color:var(--ok);font-weight:600">8,592</td><td class="num">—</td><td class="num">—</td></tr>
-          <tr><td class="num">M399_3</td><td class="num">−2.5°</td><td class="num">10,366</td><td class="num">10,410</td><td class="num" style="color:var(--ok);font-weight:600">10,366</td><td class="num">10,610</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p style="font-size:.93rem;color:var(--ink-2)">The rectangles are generous — they contain ARC, VMH, DMH and ME <em>plus</em> surrounding LHA, PH and TU. Sub-nucleus assignment inside the ROI is what the DMH question rests on, so it is not a detail.</p>
   </section>
 
   <hr class="rule">
 
   <section>
-    <div class="eyebrow">Pipeline · stages run in dependency order</div>
-    <h2>How the analysis proceeds</h2>
+    <div class="eyebrow">Next, in order of value</div>
+    <h2>What moves this toward a publishable claim</h2>
     <ol class="stages">
-      <li><div class="st-body"><h3>QC with negative-control calibration</h3><p>The 27 negative-control probes and 41 negative-control codewords give a per-section false-detection rate. This sets the threshold for what counts as a real Galr1 transcript — the question always asked of a low-abundance GPCR.</p></div></li>
-      <li><div class="st-body"><h3>Does the tissue actually look older?</h3><p><span class="gene">Gfap</span>, <span class="gene">Cd68</span>, <span class="gene">Trem2</span>, <span class="gene">Spp1</span>, <span class="gene">Cd44</span> should rise in the aged animals. Run early and cheaply — if the canonical ageing signature is absent, that reframes everything downstream.</p></div></li>
-      <li><div class="st-body"><h3>Cell typing by three independent routes</h3><p>Label transfer from <strong>HypoMap</strong> (384,925 hypothalamic cells), from the <strong>Allen ABC atlas</strong>, and unsupervised Leiden with manual marker annotation. Cells kept where routes agree; concordance reported.</p></div></li>
-      <li><div class="st-body"><h3>Nucleus assignment, also triangulated</h3><p>The panel lacks <span class="gene">Nr5a1</span>, <span class="gene">Tbx3</span> and <span class="gene">Trh</span>, so markers alone cannot call nuclei. Allen CCF registration, ABC-atlas spatial mapping and Banksy spatial domains, reconciled — plus a <strong>continuous</strong> frame (distance to 3rd ventricle, dorsoventral depth) that is immune to registration error.</p></div></li>
-      <li><div class="st-body"><h3>The Galr1 analysis</h3><p>Three separable claims, tested separately — see below. Run in parallel for <span class="gene">Galr3</span> and the ligand <span class="gene">Gal</span>, because a shift in ligand–receptor <em>balance</em> is a stronger result than a receptor count.</p></div></li>
-      <li><div class="st-body"><h3>Spatial and circuit analyses</h3><p>Gal→Galr1 neighbourhood coupling, Galr1 as a spatial gradient along the ventricular axis, niche composition around Galr1⁺ DMH neurons. This is what separates a spatial paper from a dissociated-tissue paper.</p></div></li>
-      <li><div class="st-body"><h3>Robustness battery</h3><p>Leave-one-animal-out, section-level replication, exact blocked permutation, threshold and segmentation sensitivity, negative-control genes, and a power curve for n&nbsp;=&nbsp;2/3/5/8. Reported whether or not it is flattering.</p></div></li>
+      <li><div class="st-body"><h3>Nucleus assignment</h3><p>Registration to the Allen CCF plus spatial-domain clustering and marker anchors, reconciled — with a continuous distance-to-3rd-ventricle frame alongside. Removes the ROI-geometry confound and answers the DMH question properly. <strong>Needs the DAPI images</strong> for proper registration.</p></div></li>
+      <li><div class="st-body"><h3>The other six sections</h3><p>Each animal has 2–3 sections; only one per animal has an ROI. Adding them stabilises every per-animal estimate and directly tests whether the DMH result survives a different cut. Either you draw the ROIs or we propagate them by landmark registration for your approval.</p></div></li>
+      <li><div class="st-body"><h3>Cohort B as independent replication</h3><p>Different pipeline version and segmentation, so it cannot be pooled — but if it is also adult vs aged, agreement across two independently processed cohorts is worth more than pooling would be. Needs its ages and groups.</p></div></li>
+      <li><div class="st-body"><h3>More animals, and ideally older ones</h3><p>An effect the size of the tanycyte <span class="gene">Gal</span> drop would need roughly n = 5–8 per group to be demonstrable. An 18–24-month group would turn the middle-aged caveat into an ageing trajectory.</p></div></li>
     </ol>
   </section>
 
-  <section>
-    <div class="eyebrow">The intellectual core</div>
-    <h2>"Galr1 changed" is three different claims</h2>
-    <p>Reporting a shift without separating these is the most common way an in-situ receptor paper gets sent back.</p>
-    <dl class="abc">
-      <div><dt>A</dt><dd>A different <strong>fraction of cells</strong> expresses Galr1.<em>Per-animal detection rate per cell type × nucleus, against a background-calibrated threshold.</em></dd></div>
-      <div><dt>B</dt><dd>The <strong>same cells express more or less</strong> Galr1.<em>Pseudobulk per animal × cell type × nucleus; negative binomial with a total-count offset, <code>~ age + batch</code>.</em></dd></div>
-      <div><dt>C</dt><dd>The <strong>abundance of Galr1-high cell types</strong> changed.<em>Compositional analysis — a different finding entirely, and one that can masquerade as A or B.</em></dd></div>
-    </dl>
-  </section>
-
-  <section>
-    <div class="eyebrow">Statistics</div>
-    <h2>The honest power position</h2>
-    <div class="card">
-      <p>With 2 vs 2 in a blocked design, the exact permutation null has only four label assignments. The observed assignment and its mirror are indistinguishable, so <strong>the smallest attainable exact two-sided p-value is 0.5</strong> — for any gene, however large the effect. No analysis choice changes this.</p>
-      <hr class="rule">
-      <p style="font-size:.95rem"><strong>What this cohort delivers:</strong> a rigorously annotated spatial atlas, per-animal effect sizes with confidence intervals, replication across two independent batches and across sections, and a ranked shortlist of cell&nbsp;type&nbsp;×&nbsp;nucleus hypotheses.</p>
-      <p style="font-size:.95rem"><strong>What a high-impact claim additionally needs:</strong> the second cohort as independent replication, or more animals (n&nbsp;≥&nbsp;5 per group makes standard pseudobulk testing meaningful), or orthogonal validation of top hits by RNAscope — which such journals expect for an in-situ receptor claim regardless of n.</p>
-    </div>
-  </section>
-
-  <hr class="rule">
-
-  <section>
-    <div class="eyebrow">To proceed</div>
-    <h2>What I need from you</h2>
-    <ul class="asks">
-      <li><span class="n">01</span><span><strong>The expression matrices.</strong> <code>cell_feature_matrix.h5</code> per section. Everything else is blocked on this. Boundaries and DAPI images are valuable too — DAPI is what makes proper Allen CCF registration, and therefore confident nucleus labels, possible.</span></li>
-      <li><span class="n">02</span><span><strong>Ages and groups for the second cohort</strong> — K238, P953, F739, Q378. On Drive they sit under a folder named "Female", so sex is confounded with platform version and no sex claim is available. But if that cohort is also adult vs aged, it becomes an <em>independent replication set processed on a different pipeline version</em> — worth more to the power position above than a sex comparison would be.</span></li>
-      <li><span class="n">03</span><span><strong>ROIs for the remaining sections.</strong> The export covers one section per animal; six more exist. Either you draw them, or we propagate the existing ROI by landmark registration and you approve the result.</span></li>
-    </ul>
-  </section>
-
   <footer>
-    Full factual basis in <code>docs/DATA_AUDIT.md</code>; complete plan in <code>docs/ANALYSIS_PLAN.md</code>. ROI selection is implemented in <code>src/spatial_lea/roi.py</code> and locked down by tests that fail if the transform convention is broken.
+    Full write-up in <code>docs/RESULTS.md</code>; factual basis in <code>docs/DATA_AUDIT.md</code>; plan in <code>docs/ANALYSIS_PLAN.md</code>. Pipeline is <code>scripts/02_qc.py</code> → <code>03_cluster.py</code> → <code>04_annotate.py</code> → <code>05_galr1.py</code> → <code>06_section_matching.py</code>, with ROI selection locked down by tests that fail if the transform convention breaks.
   </footer>
 
 </div>
