@@ -1,0 +1,26 @@
+diff --git a/src/processing/utils/cli_wrappers.jl b/src/processing/utils/cli_wrappers.jl
+index a7c52c7..21021c8 100644
+--- a/src/processing/utils/cli_wrappers.jl
++++ b/src/processing/utils/cli_wrappers.jl
+@@ -65,11 +65,16 @@ function run_segmentation(
+ 
+     segmented_df, cell_stat_df, cm = get_segmentation_results(bm_data, gene_names; run_id)
+ 
+-    @info "Estimating local colors"
+-    gene_colors = gene_composition_colors(
+-        bm_data.x, plot_opts.gene_composition_neigborhood; method=Symbol(plot_opts.ncv_method)
+-    )
+-    segmented_df[!, :ncv_color] = "#" .* Colors.hex.(gene_colors)
++    # PATCHED (Spatial_LEA): only needed for the HTML plot, and it densifies a
++    # n_molecules x n_genes neighbourhood matrix, which OOMs at 5M molecules.
++    # ncv_color is consumed solely by cli/main.jl:146, which is guarded by `plot`.
++    if plot
++        @info "Estimating local colors"
++        gene_colors = gene_composition_colors(
++            bm_data.x, plot_opts.gene_composition_neigborhood; method=Symbol(plot_opts.ncv_method)
++        )
++        segmented_df[!, :ncv_color] = "#" .* Colors.hex.(gene_colors)
++    end
+ 
+     poly_joined, polygons = nothing, nothing
+     if save_polygons || plot
