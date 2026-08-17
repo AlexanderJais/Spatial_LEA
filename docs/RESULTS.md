@@ -1,154 +1,143 @@
-# Results — Galr1 in the ageing MBH (cohort A, 2 aged vs 2 adult)
+# Results — Galr1 in the ageing MBH
 
-Pipeline run on the four ROI sections: `scripts/02_qc.py` → `03_cluster.py` →
-`04_annotate.py` → `05_galr1.py` → `06_section_matching.py`.
-Tables and figures under `results/`.
+Cohort A: 4 male mice (2 aged ~15–16 mo, 2 adult ~7 mo), **12 sections, 3 per
+animal**, anatomically registered MBH.
 
-**Headline: Galr1 shows no systematic age difference across MBH cell types at
-this n.** Cross-block agreement is at chance level. The most consistent signal
-in the galanin system is in the ligand `Gal`, not the receptor — and one
-striking-looking composition result is probably an artefact of where the
-sections were cut. Details below.
+Pipeline: `02_qc` → `03_cluster` → `04_annotate` → `07_calibrate_anchors` →
+`08_anatomy` → `09_mbh_atlas` → `10_galr1_nucleus`. Tables under `results/`.
 
 ---
 
-## 1. The data is technically excellent
+## Headline
 
-| | F536 (aged) | G_073 (aged) | M493 (adult) | M399 (adult) |
-|---|---|---|---|---|
-| MBH ROI cells | 11 614 | 8 592 | 10 291 | 10 366 |
-| passing QC | 99.9% | 100.0% | 99.8% | 99.7% |
-| median counts/cell | 201 | 269 | 243 | 245 |
-| median genes/cell | 72 | 82 | 78 | 79 |
-| negative-control probe rate | 0.012% | 0.012% | 0.013% | 0.012% |
-| multinucleate segmentations | 0% | 0% | 0% | 0% |
+**Galr1 shows no age difference that survives the additional sections.** The one
+lead from the 4-section analysis — a Galr1-high GABAergic population — turned
+out to sit in the **DMH**, which is the anatomy the study was asking about, and
+its apparent ~20% decrease in aged mice is **inseparable from a steep
+rostro-caudal gradient**: a single animal's own three sections span more Galr1
+than the two age groups differ by.
 
-40 783 cells survive QC (≥10 counts, ≥5 genes, single nucleus).
+That is a negative result for the receptor, and a positive result about study
+design: **AP-matched sections are required**, and the data now says by how much.
 
-**Galr1 is measured well above background.** It is detected in 15.3–19.0% of
-ROI cells, versus 0.07–0.09% (median) and 0.55–0.80% (max) for the 27
-negative-control probes — a **23–30× margin**. Galr3 is detected in 5.2–6.7%,
-`Gal` in 30–42%. The receptor question is answerable with this data.
+### Two corrections to the earlier 4-section report
 
-## 2. A clean 32-type MBH atlas
+| earlier claim | with 12 sections |
+|---|---|
+| "Tanycyte `Gal` down ~2× in aged — the tightest, most reproducible effect" | **Does not replicate.** Detection LFC B1 −0.40 / B2 +0.11; expression B1 +0.56 / B2 −0.02 — inconsistent in both metrics. |
+| "The DMH Grp/Ppp1r17 abundance result is probably geometry" | **Not geometry.** Per-nucleus normalisation made it *larger* (LFC +2.30 / +5.05). But it is still not safe — see §4. |
 
-Leiden at resolution 1.0 gives 33 clusters, animal-mixing entropy median 0.99
-(1.0 = perfectly mixed), and all canonical markers land where they should —
-**16/16 class markers enriched in their assigned class**. One 12-cell cluster
-was dropped as low quality.
+---
 
-Every expected MBH population is recovered, including `ARC Agrp/Npy`,
-`ARC Pomc`, `ARC Th/Slc6a3` (TIDA), `ARC Tac2/Esr1` (KNDy-like),
-three `VMH-like` glutamatergic types, `DMH Grp/Ppp1r17`, `LHA Hcrt`,
-`Oxt/Avp` magnocellular, tanycytes, ependyma, and full glial and vascular sets.
+## 1. Anatomical registration replaces the drawn boxes
 
-**One cluster has `Galr1` itself as a defining marker** (LFC 2.9): a GABAergic
-`Gal`/`Galr1`/`Foxp2`/`Th` population, 1 705 cells, **53–67% Galr1⁺**. This is
-the cell type where galanin autoreceptor-like signalling is concentrated, and it
-is the natural focus of the biology.
+Each section now carries a coordinate frame built from its own anatomy: `ml` =
+signed distance from the third-ventricle midline, `dv` = distance dorsal from
+the ventral surface. The ventricle is traced from tanycytes (`Gpr50`) and
+ependyma (`Spag16`), seeded at the arcuate centroid; the arcuate also fixes
+which way is ventral, so mounting angle stops mattering.
 
-## 3. Galr1: no systematic age effect
+ARC, VMH and DMH are fitted once in that shared frame and applied to all 12
+sections. The geometry was recovered, not imposed:
 
-Per-animal detection rate and depth-normalised expression, within-block log2
-fold changes (B1 = F536/M493, B2 = G_073/M399), gated at ≥30 cells and ≥15
-expressing cells per animal so fold changes are not driven by near-zero
-denominators.
+| nucleus | centre \|ml\| | centre dv | anatomy |
+|---|---|---|---|
+| ARC | 166 µm | 188 µm | ventral midline |
+| VMH | 366 µm | 529 µm | dorsolateral to ARC |
+| DMH | 336 µm | 1172 µm | dorsal to VMH |
 
-| gene | metric | cell types tested | agree across blocks | binomial p |
-|---|---|---|---|---|
-| Galr1 | detection rate | 16 | 8 | 0.60 |
-| Galr1 | counts per 10k | 16 | 10 | 0.23 |
-| Galr3 | detection rate | 8 | 3 | 0.86 |
-| Galr3 | counts per 10k | 8 | 3 | 0.86 |
-| Gal | counts per 10k | 29 | 11 | 0.93 |
+Validation against annotated cells: 99.5% of ARC Agrp/Npy, 92.7% of ARC Pomc,
+92.2% of VMH-like Rasgrf2 and 81.1% of DMH Grp/Ppp1r17 land in their expected
+nucleus. KNDy/Tac2 neurons do not (7.5%) — a known limitation, not tuned away.
 
-Agreement is what two coin flips would give. **Nothing in Galr1 or Galr3 passes
-a shortlist of "consistent in both blocks and ≥1.5× in the weaker block."**
+**MBH cells are now balanced across animals** (ARC 3479–3925, DMH 3015–3662,
+VMH 5205–5734 per animal), which the 40%-varying rectangles were not.
 
-The closest thing to a Galr1 signal is a modest, consistent *decrease* in the
-`GABA Gal/Galr1` population itself — the one type where the measurement is most
-precise:
+M399_2, the section the lab flagged as distorted, was independently flagged by
+the frame — ventricle elongation 1.25 versus 2.9–5.8 elsewhere, and an inverted
+ventral direction before arcuate seeding.
 
-| | F536 aged | G_073 aged | M493 adult | M399 adult | LFC B1 | LFC B2 |
-|---|---|---|---|---|---|---|
-| detection % | 53.4 | 64.2 | 63.9 | 67.2 | −0.26 | −0.07 |
-| counts / 10k | 54.5 | 54.7 | 67.3 | 71.9 | −0.31 | −0.39 |
+## 2. The Galr1 population is a DMH population
 
-Consistent in direction in both blocks and both metrics, ~22–24% lower in aged.
-Worth carrying forward as a hypothesis — but the aged animals do not separate
-from the adults beyond within-group spread, so it is a lead, not a finding.
+The cluster with `Galr1` as a defining marker — GABAergic, `Gal`/`Galr1`/
+`Foxp2`/`Th`, 2 338 cells across 12 sections — is **96.6% DMH** (2 259 DMH, 61
+VMH, 18 ARC). So the answer to "is it DMH neurons?" is yes: that is where MBH
+Galr1 is concentrated, in a GABAergic galanin-co-expressing population.
 
-## 4. The ligand moves more than the receptor
+Galr1 detection in it is high and well measured: 46–83% of cells depending on
+section, against 0.07–0.09% for negative-control probes.
 
-Three effects pass the shortlist, all in `Gal`:
+## 3. But the age effect is confounded with rostro-caudal position
 
-| cell type | metric | LFC B1 | LFC B2 | direction |
-|---|---|---|---|---|
-| Tanycyte | detection | −0.87 | −0.89 | **down in aged (~1.8×)** |
-| Tanycyte | counts/10k | −0.67 | −1.35 | **down in aged (~2×)** |
-| ME / meningeal fibroblast | counts/10k | −0.68 | −0.76 | down in aged |
-| ARC Agrp/Npy | counts/10k | +1.02 | +0.62 | **up in aged (~1.8×)** |
+Per-animal means look convincing — aged 51.3% and 70.5%, adult 73.5% and 80.9%,
+a 16.3-point gap, consistent in both blocks. The per-section values are not:
 
-Tanycyte `Gal` down and ARC Agrp/Npy `Gal` up, each consistent across two
-independent blocks, is a more interesting shape than a flat receptor change: it
-suggests the ageing shift is in galanin *availability* and *source*, not in
-receptor abundance. It is still n=2 vs 2 and needs replication.
-
-## 5. The ageing signature is present but modest
-
-`Gfap` (+0.24), `Cd68` (+0.25) and `Trem2` (+0.30 log2) rise consistently in
-both blocks. `Spp1`, `Cd44` and `Igfbp5` disagree between blocks, and `Ly6a`
-falls. A partial glial/microglial signature is what 15–16-month animals should
-look like — consistent with the middle-aged framing, and an argument for adding
-an 18–24-month group.
-
-## 6. Important caveat — one striking result is probably geometry
-
-`DMH Grp/Ppp1r17` looks like a dramatic age effect: 1.57% and 1.22% of ROI cells
-in the aged animals versus 0.46% and 0.10% in the adults — consistent in both
-blocks, up to 16× range. **It should not be reported as an ageing phenotype
-without more work.**
-
-Composition correlation between sections is **r = 0.934 within group vs 0.905
-between group** — group differences are barely above section-to-section noise.
-And the AP-informative populations do not shift coherently:
-
-| population | AP hint | F536 | G_073 | M493 | M399 |
+| animal | group | section 1 | section 2 | section 3 | swing |
 |---|---|---|---|---|---|
-| Oxt/Avp magnocellular | rostral | 0.33 | 0.44 | 0.54 | 0.62 |
-| ARC Pomc | mid | 1.91 | 2.37 | 1.88 | 1.96 |
-| VMH-like Rasgrf2 | mid | 4.22 | 5.74 | 5.23 | 5.41 |
-| DMH Grp/Ppp1r17 | caudal | 1.57 | 1.22 | 0.46 | 0.10 |
-| LHA Hcrt | caudal-lateral | 1.41 | 1.38 | 2.63 | 2.61 |
+| M399 | adult | 81.5 | 80.3 | 80.9 | 1.1 |
+| M493 | adult | 79.3 | 73.7 | 67.5 | 11.8 |
+| F536 | aged | 57.1 | 50.8 | 45.9 | 11.1 |
+| G_073 | aged | **80.4** | 71.1 | 59.9 | **20.5** |
 
-If the aged sections were simply cut more caudally, DMH **and** Hcrt should both
-rise. DMH rises 16× while Hcrt *falls* — so this is not a clean AP shift but a
-combination of cut level and ROI placement. The ROI rectangles differ in area by
-40% (3.68–5.15 mm²) and are hand-drawn, so how much DMH versus LHA each box
-captures is partly a drawing decision.
+`G073_1` at 80.4% is an *aged* section above every adult section except M399's.
+Galr1 detection correlates **r = +0.85 (p < 0.001)** with a composition axis
+(PC1 of cell-type proportions across sections), and that correlation holds
+**within** animals, where age is constant and any slope must be anatomical.
 
-**The fix is the nucleus assignment step**: express each population as a
-fraction of cells *within its own nucleus* rather than of the whole ROI, which
-removes box geometry from the denominator entirely.
+**One animal's own sections span 20.5 points; the age groups differ by 16.3.**
+
+The axis also separates the groups perfectly (aged PC1 −4.74…−0.69, adult
+−0.10…+5.44, no overlap), so at n=2 per group age and anatomical position are
+fully collinear and cannot be separated. Adjusting for PC1 flips the effect from
+−16.3 to +4.1 points, which is over-adjustment rather than evidence of absence.
+Either way the claim is not supportable from this data.
+
+## 4. DMH Grp/Ppp1r17 abundance — bigger, still not safe
+
+As a share of DMH cells: F536 17.7%, G_073 7.9% (aged) versus M493 3.6%,
+M399 0.2% (adult). Consistent and large in both blocks. But M399 has almost no
+Grp⁺ DMH neurons at all (0.23%), and the within-group spread is 2–15×. `Grp`
+marks a rostro-caudally restricted DMH subpopulation, so this is the same AP
+problem as §3 in a different guise. Per-nucleus normalisation fixed the *box*
+confound; it cannot fix the *plane* confound.
+
+## 5. What did hold up: the ligand, not the receptor
+
+Four `Gal` effects are consistent in both blocks and ≥1.5× in the weaker one:
+
+| nucleus | cell type | LFC B1 | LFC B2 |
+|---|---|---|---|
+| DMH | GABA Cacna2d2 | +1.14 | +1.92 |
+| VMH | Astrocyte | +0.96 | +1.15 |
+| ARC | Microglia | +0.96 | +0.70 |
+| ARC | ARC Agrp/Npy | +0.79 | +0.66 |
+
+`Gal` **up** in aged across neurons, astrocytes and microglia in three different
+nuclei, while the receptor stays flat, is a more coherent shape than anything
+seen in Galr1 — but it has not been checked against the AP gradient the way §3
+was, and must be before it is trusted.
+
+## 6. Ageing signature
+
+`Gfap` (+0.24), `Cd68` (+0.25), `Trem2` (+0.30 log2) up consistently in both
+blocks; `Spp1`, `Cd44`, `Igfbp5` inconsistent, `Ly6a` down. A partial glial
+signature, as expected at 15–16 months.
 
 ---
 
-## What this means for the paper
+## What this means for the study
 
-The atlas, the QC and the Galr1 measurement are solid and publication-grade.
-The age contrast is not yet: for Galr1 specifically the honest statement is
-*"no detectable systematic change across MBH cell types in 2 vs 2 middle-aged
-versus adult male mice,"* with the `GABA Gal/Galr1` decrease and the tanycyte
-`Gal` decrease as the leads worth pursuing.
+The atlas, the anatomical registration and the Galr1 measurement are solid. The
+biological claim is not there yet, and the reason is now specific and fixable
+rather than vague:
 
-Next, in order of value:
-
-1. **Nucleus assignment** (plan §5) — removes the ROI-geometry confound and is
-   the only way to answer "is it the DMH?" properly.
-2. **The other 6 sections** of these same animals — each animal has 2–3
-   sections; using them stabilises per-animal estimates and directly tests
-   whether the DMH result survives a different cut.
-3. **Cohort B** as independent replication.
-4. **More animals.** At n=2 vs 2 the exact blocked permutation floor is p=0.5
-   two-sided; a real Galr1 effect of the size seen here would need n≈5–8 per
-   group to be demonstrable.
+1. **Match sections on rostro-caudal position.** This is the single highest-value
+   change. The composition PC1 built here is already a usable AP proxy; with the
+   DAPI images now available, Allen CCF registration would give a calibrated one.
+   Without matching, a 20-point Galr1 swing is available for free.
+2. **Re-test `Gal`** against that axis, the way Galr1 was tested in §3.
+3. **More animals.** With n=2 per group, any axis that happens to separate the
+   four animals is perfectly collinear with age. n≈5–8 per group breaks that.
+4. **Consider the DMH Gal/Galr1 population as the target** for orthogonal
+   validation. It is a real, well-defined, Galr1-rich DMH population and it is
+   the right cell type to count by RNAscope in AP-matched sections.
