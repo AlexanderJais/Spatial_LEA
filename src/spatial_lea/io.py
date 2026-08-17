@@ -4,7 +4,7 @@ A Xenium ``cell_feature_matrix.h5`` holds the panel genes *and* the control
 channels (negative-control probes, negative-control codewords, genomic controls,
 unassigned/deprecated codewords) in one matrix.  The controls are what make it
 possible to say whether a low count for a gene like ``Galr1`` is signal or
-background, so they are kept in ``adata.uns`` rather than discarded on load.
+background, so they are split out into ``obs``/``obsm`` rather than discarded.
 """
 
 from __future__ import annotations
@@ -118,3 +118,20 @@ def load_all(sections=tuple(SECTION_ANIMAL), raw: Path = RAW, roi_only: bool = F
     merged = ad.concat(parts, label="section_key", keys=list(sections), index_unique="-", merge="same")
     merged.uns["sections"] = list(sections)
     return merged
+
+
+def counts_vector(adata, gene: str) -> np.ndarray:
+    """Raw counts for one gene as a dense 1-D array.
+
+    ``adata.X`` is z-scored after ``sc.pp.scale``, so ``X > 0`` is meaningless as
+    a detection test.  Counts always come from the ``counts`` layer.
+    """
+    if "counts" not in adata.layers:
+        raise KeyError("no 'counts' layer; load with load_section or 03_cluster.py")
+    col = adata[:, gene].layers["counts"]
+    return np.asarray(col.todense() if hasattr(col, "todense") else col).ravel()
+
+
+def counts_matrix(adata) -> np.ndarray:
+    mat = adata.layers["counts"]
+    return np.asarray(mat.todense() if hasattr(mat, "todense") else mat)
