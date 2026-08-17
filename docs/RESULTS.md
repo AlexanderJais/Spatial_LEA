@@ -352,7 +352,26 @@ r = −0.69, p = 0.002; the correct nesting-aware p is **0.062**. The claim that
 `Gal` in ARC Agrp/Npy is "AP-independent (p = 0.63)" rested on the same
 miscalibrated test and carries little weight on its own.
 
-### The replacement: within-animal AP correction
+### RETRACTED — the correction below extrapolates and should not be used
+
+The within-animal AP slope is fitted over a mean within-animal range of **1.16
+AP units** and then applied across the **6.23-unit** between-animal range — a
+**5.4x extrapolation**. For `Galr1` the largest adjustment is **0.900 log2,
+186% of the 0.484 effect it corrects**. The "93.6% removed, sign flips" result
+below is a property of that extrapolation, not of the data.
+
+**Use the raw section values instead.** They answer the question without a model:
+
+| | adult M399 | adult M493 | aged F536 | aged G_073 | |
+|---|---|---|---|---|---|
+| `Galr1`, DMH Gal/Galr1 | 12.67–12.88 | 12.45–12.87 | 11.76–12.46 | 12.28–12.71 | **ranges overlap — not separable** |
+| `Gal`, ARC Agrp/Npy | 11.22–11.40 | 10.88–11.72 | 11.80–12.15 | 11.85–12.07 | **complete separation, 6 vs 6 sections** |
+
+(log2 CPM per section.) The `Gal` effect is **+0.67 log2 (1.59x)** raw, not the
++0.45 quoted below. The `Galr1` conclusion is unchanged — aged and adult
+sections overlap, so it is not separable at this n.
+
+### Superseded: within-animal AP correction
 
 Age is constant inside an animal, so any dependence of expression on
 rostro-caudal level measured *within* animals is anatomical by construction and

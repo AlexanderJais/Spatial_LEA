@@ -48,22 +48,23 @@ than any pooled p-value, and immune to the n = 2 problem.
 These have a valid unit of replication that is *not* the animal, so they carry
 real p-values.
 
-**Rostro-caudal correction.** Not the pairwise correlation — that version was
-audited and failed (AP gap is perfectly confounded with block, the 18 pairings
-share sections so the p-value is anticonservative ~40×, and 38% of the panel
-fires at p<0.05). Use instead the **within-animal AP slope**: fit
-`log2 CPM ~ AP + animal`, where the animal term absorbs age, so the slope is
-anatomical by construction. Correct each section to a common AP level and
-recompute the blocked effect, calibrating the shrinkage against the whole panel.
+**Rostro-caudal position — report raw section values, do not model it.** Two
+model-based approaches were tried and both failed audit. The pairwise
+correlation is confounded with block and anticonservative. The within-animal
+regression correction extrapolates 5.4x beyond the range its slope is fitted
+over, producing adjustments up to 186% of the effect being corrected.
 
-- `Galr1` in DMH Gal/Galr1 neurons: **93.6% of the effect removed, sign flips**;
-  only 5.4% of panel genes shrink as much → anatomical.
-- `Gal` in ARC Agrp/Npy neurons: **32.6% removed**, sign kept in both blocks,
-  shrinkage typical of the panel (rank 22.4%) → survives, at +0.45 log2.
+Report the per-section values and let the reader see the overlap:
 
-This is the most defensible inferential result in the study, and a
-methodological contribution: it quantifies and removes a confound that spatial
-hypothalamic studies generally do not control.
+- `Galr1` in DMH Gal/Galr1: aged sections 11.76–12.71, adult 12.45–12.88 —
+  **overlapping**, so the age difference is not separable from section-level
+  variation.
+- `Gal` in ARC Agrp/Npy: aged 11.80–12.15, adult 10.88–11.72 — **complete
+  separation across all 12 sections**, effect +0.67 log2 (1.59x).
+
+Complete separation of 6 vs 6 sections is descriptive reproducibility, not a
+p-value (sections within an animal are not independent). But it needs no model,
+and it is what the AP work was trying and failing to establish.
 
 **Panel-null calibration.** Applying identical filters (consistent direction in
 both blocks, ≥1.5× in the weaker block, complete section-level separation within
@@ -137,10 +138,9 @@ So the honest negative statement is:
 
 And the honest positive statement:
 
-> "`Gal` in ARC Agrp/Npy neurons differs by 1.37× (log2 +0.45) after correction
-> for rostro-caudal position, consistent in direction in both blocks, and one of
-> 9 of 297 panel genes passing all reproducibility filters. Confirming it at 80%
-> power requires n ≥ 5–6 per group."
+> "`Gal` in ARC Agrp/Npy neurons differs by 1.59× (log2 +0.67), with all six aged sections
+> above all six adult sections, and is one of 9 of 297 panel genes passing all
+> reproducibility filters. Confirming it at 80% power requires n ≥ 5 per group."
 
 ---
 
