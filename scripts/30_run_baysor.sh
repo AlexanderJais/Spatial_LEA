@@ -16,12 +16,16 @@
 #
 #   -m 30   minimum molecules for a cell to be called real.  Nuclei alone carry a
 #           median of 119 molecules here, so 30 only removes fragments.
-#   -s 6.0  expected cell *radius* in um.  Not estimated from the prior, because
-#           the prior is nuclei only (radius ~4 um) and estimating from it would
-#           bake the under-capture we are trying to remove back in.  6 um is the
-#           centre of a mixed neuron/glia population: real somata run 15-25 um
-#           across for neurons and 8-12 um for glia.  Baysor treats it as a prior
-#           mean with a 25% spread and adapts per cell.
+#   -s 6.0 --scale-std 50%
+#           expected cell *radius* in um, and how wide a spread of sizes one run
+#           may cover.  Chosen by scripts/32_baysor_scale_sweep.py, not by eye --
+#           see results/baysor/scale_sweep.csv.  Scored against the measured DAPI
+#           nuclei, 4 um has the fewest errors only because it never leaves the
+#           nucleus (8.1 um cells against a 7.1 um nucleus, half the counts per
+#           cell), while 8-10 um merges 21-29% of nuclei into shared cells.  6 um
+#           is the only setting whose cell count its own cell size can account
+#           for, and it is not estimated from the prior: the prior is nuclei only,
+#           so estimating from it would bake the under-capture back in.
 #   --prior-segmentation-confidence 0.5
 #           the DAPI nuclei are real measurement, so they are trusted, but not
 #           absolutely -- 0.5 lets Baysor split or merge where the molecular
@@ -47,7 +51,7 @@ mkdir -p "$OUT"
 
 echo "=== Baysor: $SECTION ($(wc -l < "$IN") molecules, $JULIA_NUM_THREADS threads) ==="
 time "$JULIA_BIN" --project="$BAYSOR_HOME" -e 'using Baysor; Baysor.command_main()' -- \
-    run -x x -y y -z z -g gene -m 30 -s 6.0 \
+    run -x x -y y -z z -g gene -m 30 -s 6.0 --scale-std 50% \
     --prior-segmentation-confidence 0.5 \
     --n-clusters 8 \
     --count-matrix-format tsv \

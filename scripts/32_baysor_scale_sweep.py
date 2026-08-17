@@ -4,28 +4,48 @@
 ``scale`` is the expected cell radius, and it is the one Baysor parameter that
 encodes the same kind of assumption we are trying to get rid of.  Picking it by
 eye would replace a 5 um dilation with a 6 um guess, so it is swept on a 600 um
-patch -- cheap enough to run many settings -- and scored on four things that can
-be checked without believing any cell-type model:
+patch -- cheap enough to run many settings -- and scored against the DAPI nuclei,
+which are measured rather than inferred.
 
-  1. cells per DAPI nucleus.  Every cell in a section plane has at most one
-     nucleus in that plane, and the nuclei are measured, not inferred.  A setting
-     that yields far more or far fewer cells than nuclei is wrong regardless of
-     anything else.  **This is the primary criterion.**
-  2. molecules assigned.  Molecules dropped as noise are signal thrown away.
-  3. mixed GABAergic/glutamatergic rate among cells carrying either marker --
-     the artefact being removed.  Read only together with (2), since a setting
-     can always look clean by shrinking cells until they hold no markers.
-  4. one-to-one agreement with the DAPI nuclei: neither split across two Baysor
-     cells nor merged with another nucleus.
+**Primary criteria: the two unambiguous errors.**  Whatever a cell's true shape,
+assigning two distinct measured nuclei to one cell is wrong, and scattering one
+nucleus's own molecules across several cells is wrong.  Neither needs a
+cell-type model, a size assumption or a ground truth beyond the DAPI image.
+
+  merge rate  % of nuclei whose dominant cell also dominates another nucleus
+  split rate  % of nuclei with under 80% of their molecules in one cell
+
+**Secondary: is the cell count self-consistent with the cell size?**  The naive
+expectation of one cell per nucleus is wrong, because a cell can cross the
+section plane while its nucleus does not.  Modelling cells as spheres of
+diameter ``d`` with concentric nuclei of diameter ``n``, centres uniform in z, a
+cell intersects a section of thickness ``t`` with probability proportional to
+``d + t`` and its nucleus with probability proportional to ``n + t``, so
+
+    cells visible per visible nucleus  =  (d + t) / (n + t)
+
+Every term on the right is measured: ``n`` from nucleus_boundaries, ``t`` from
+the run's own thickness_of_high_quality_decoded_transcripts, ``d`` from the cell
+sizes that same setting produced.  So this is a self-consistency test -- a
+setting that invents extra cells must also produce cells large enough to justify
+them.  It is secondary because Baysor's area is the hull of the molecules that
+happen to fall in the slice, which understates ``d``, biasing the ratio upward
+by an unknown amount.  Its use is to rule out the extremes, not to fine-tune.
+
+**Read alongside**: molecules retained (dropping them throws away signal) and
+the mixed GABAergic/glutamatergic rate (the artefact being removed).  The mixed
+rate must never be read alone -- any setting can look clean by shrinking cells
+until they hold no markers at all.
 
     python scripts/32_baysor_scale_sweep.py --patch-csv <molecules.csv>
+    python scripts/32_baysor_scale_sweep.py --patch-csv <...> --rescore-only
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -36,6 +56,8 @@ import pandas as pd
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
+
+from spatial_lea.io import RAW  # noqa: E402
 
 OUT = REPO / "results" / "baysor"
 GABA = ["Gad1", "Gad2", "Slc32a1"]
@@ -69,10 +91,19 @@ def run_one(molecules: Path, scale: float, scale_std: str, workdir: Path) -> Pat
     return out
 
 
-def score(out: Path, n_prior: int) -> dict:
+def tissue_geometry(section: str) -> tuple[float, float]:
+    """Measured nucleus diameter and effective section thickness, in um."""
+    ex = json.loads((RAW / section / "experiment.xenium").read_text())
+    t = float(ex["thickness_of_high_quality_decoded_transcripts"])
+    area = pd.read_parquet(RAW / section / "cells.parquet", columns=["nucleus_area"])
+    n = float(np.median(2 * np.sqrt(area["nucleus_area"] / np.pi)))
+    return n, t
+
+
+def score(out: Path, n_prior: int, nucleus_um: float, thickness_um: float) -> dict:
     counts = pd.read_csv(out / "segmentation_counts.tsv", sep="\t", index_col=0).T
-    mol = pd.read_csv(out / "segmentation.csv",
-                      usecols=["prior", "cell", "is_noise"])
+    stats = pd.read_csv(out / "segmentation_cell_stats.csv", index_col=0)
+    mol = pd.read_csv(out / "segmentation.csv", usecols=["prior", "cell"])
     assigned = mol[mol["cell"].notna() & (mol["cell"] != "")]
 
     keep = counts.sum(axis=1) >= 10
@@ -82,29 +113,40 @@ def score(out: Path, n_prior: int) -> dict:
     neuronal = (gaba >= MARKER_MIN) | (glut >= MARKER_MIN)
     mixed = (gaba >= MARKER_MIN) & (glut >= MARKER_MIN)
 
-    # How each DAPI nucleus fared: split if its molecules land in >1 Baysor cell
-    # that owns a majority of them; merged if a Baysor cell owns two nuclei.
+    # How each DAPI nucleus fared.  Split: under 80% of its own molecules end up
+    # in the one cell that got most of them.  Merged: that cell is also the
+    # majority owner of a second nucleus.
     p = assigned[assigned["prior"] > 0]
     per = p.groupby(["prior", "cell"]).size().rename("n").reset_index()
     dominant = per.sort_values("n", ascending=False).drop_duplicates("prior")
     total = p.groupby("prior").size()
-    intact = (dominant.set_index("prior")["n"] / total >= 0.8)
+    split = (dominant.set_index("prior")["n"] / total < 0.8)
     merged = dominant["cell"].duplicated(keep=False)
 
+    diam = float(np.median(2 * np.sqrt(stats.loc[stats.index.isin(counts.index),
+                                                 "area"] / np.pi)))
+    expected = (diam + thickness_um) / (nucleus_um + thickness_um)
+    observed = len(counts) / n_prior
     return {
         "cells": int(len(counts)),
-        "cells_per_nucleus": round(len(counts) / n_prior, 3),
+        "pct_nuclei_merged": round(float(merged.mean()) * 100, 1),
+        "pct_nuclei_split": round(float(split.mean()) * 100, 1),
+        "median_diam_um": round(diam, 1),
+        "cells_per_nucleus": round(observed, 2),
+        "expected_per_nucleus": round(expected, 2),
+        "excess": round(observed / expected, 2),
         "pct_molecules_assigned": round(len(assigned) / len(mol) * 100, 1),
         "median_counts": int(counts.sum(axis=1).median()),
         "pct_mixed": round(mixed.sum() / max(neuronal.sum(), 1) * 100, 1),
-        "pct_nuclei_intact": round(float(intact.mean()) * 100, 1),
-        "pct_nuclei_merged": round(float(merged.mean()) * 100, 1),
     }
 
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--patch-csv", required=True, type=Path)
+    p.add_argument("--section", default="G073_1", help="section the patch came from")
+    p.add_argument("--rescore-only", action="store_true",
+                   help="re-score existing runs without re-running Baysor")
     p.add_argument("--workdir", type=Path,
                    default=Path(os.environ.get("BAYSOR_SWEEP_DIR", "/tmp/baysor_sweep")))
     args = p.parse_args()
@@ -112,26 +154,44 @@ def main() -> int:
 
     mols = pd.read_csv(args.patch_csv, usecols=["prior"])
     n_prior = int(mols.loc[mols["prior"] > 0, "prior"].nunique())
-    print(f"patch: {len(mols):,} molecules, {n_prior:,} DAPI nuclei\n")
+    nucleus_um, thickness_um = tissue_geometry(args.section)
+    print(f"patch: {len(mols):,} molecules, {n_prior:,} DAPI nuclei")
+    print(f"measured geometry: nucleus {nucleus_um:.2f} um, "
+          f"section {thickness_um:.2f} um\n")
 
     rows = []
     for scale, std in GRID:
-        print(f"  scale={scale:g} um, scale_std={std}", end="", flush=True)
-        out = run_one(args.patch_csv, scale, std, args.workdir)
-        rows.append({"scale_um": scale, "scale_std": std, **score(out, n_prior)})
-        print("   " + "  ".join(f"{k}={v}" for k, v in list(rows[-1].items())[2:]),
-              flush=True)
-        shutil.rmtree(out / "segmentation.csv", ignore_errors=True)
+        out = args.workdir / f"s{scale:g}_{std.rstrip('%')}"
+        if args.rescore_only:
+            if not (out / "segmentation.csv").exists():
+                continue
+        else:
+            print(f"  scale={scale:g} um, scale_std={std}", end="", flush=True)
+            out = run_one(args.patch_csv, scale, std, args.workdir)
+        rows.append({"scale_um": scale, "scale_std": std,
+                     **score(out, n_prior, nucleus_um, thickness_um)})
 
     df = pd.DataFrame(rows)
     df.to_csv(OUT / "scale_sweep.csv", index=False)
-    print(f"\n{df.to_string(index=False)}")
+    print(df.to_string(index=False))
 
-    best = df.iloc[(df["cells_per_nucleus"] - 1).abs().argmin()]
-    print(f"\nClosest to one cell per DAPI nucleus: scale={best.scale_um:g} um, "
+    # Rank on the two unambiguous errors only; the rest is context.
+    err = df["pct_nuclei_merged"] + df["pct_nuclei_split"]
+    best = df.loc[err.idxmin()]
+    print(f"\nFewest unambiguous errors: scale={best.scale_um:g} um, "
           f"scale_std={best.scale_std} "
-          f"({best.cells_per_nucleus} cells/nucleus, {best.pct_mixed}% mixed, "
-          f"{best.pct_molecules_assigned}% of molecules kept)")
+          f"({best.pct_nuclei_merged}% merged + {best.pct_nuclei_split}% split)")
+    print(f"  but it produces {best.excess}x the cells its own cell size "
+          f"({best.median_diam_um} um) can account for.")
+    ok = df[df["excess"].between(0.8, 1.4)]
+    if len(ok):
+        pick = ok.loc[(ok["pct_nuclei_merged"] + ok["pct_nuclei_split"]).idxmin()]
+        print(f"\nFewest errors among the self-consistent settings "
+              f"(0.8 <= excess <= 1.4): scale={pick.scale_um:g} um, "
+              f"scale_std={pick.scale_std}")
+        print(f"  {pick.pct_nuclei_merged}% merged, {pick.pct_nuclei_split}% split, "
+              f"{pick.median_diam_um} um cells, {pick.excess}x expected count, "
+              f"{pick.pct_mixed}% mixed")
     print(f"\nWrote {OUT / 'scale_sweep.csv'}")
     return 0
 
