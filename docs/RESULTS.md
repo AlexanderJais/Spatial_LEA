@@ -117,7 +117,55 @@ nuclei, while the receptor stays flat, is a more coherent shape than anything
 seen in Galr1 — but it has not been checked against the AP gradient the way §3
 was, and must be before it is trusted.
 
-## 6. Ageing signature
+## 6. Unbiased search — is ANY galanin population regulated?
+
+`11_galanin_search.py` carves the MBH four ways so an effect that is not aligned
+to the cell-type labels can still surface: annotated type × nucleus (82
+populations), fine Leiden subclusters (54), the `Gal`⁺ and `Galr1`⁺ cells in
+their own right (6), and pure spatial bins — nucleus × mediolateral tertile ×
+dorsoventral tertile (27). 179 (population, gene) combinations tested.
+
+**The calibration is what makes the answer interpretable.** For every population
+the same statistic is computed for all 297 panel genes, so the galanin genes are
+ranked against a null built from the same cells, animals and blocked design.
+
+> **~9% of the panel clears "consistent in both blocks and ≥1.5× in the weaker
+> one" in a typical population** — about 27 genes per population by chance.
+> 13 of 179 galanin tests cleared it, *fewer* than the ~16 expected. The galanin
+> system as a whole is not enriched for age regulation.
+
+Adding the third filter — complete separation of aged from adult sections within
+both blocks — leaves 5 candidates, and `12_candidate_null.py` calibrates those
+against the panel too:
+
+| population | gene | genes passing all 3 filters | effect rank | gap vs largest within-animal swing | r vs AP axis |
+|---|---|---|---|---|---|
+| ARC \| ARC Agrp/Npy | **`Gal`** | **9 / 297 (3.0%)** | 27/297 | **+1727 vs 1480 CPM — gap wins** | −0.77 (p=0.003) |
+| DMH \| GABA Cacna2d2 | `Gal` | 17 / 297 (5.7%) | 19/297 | +6426 vs 4105 CPM — gap wins | −0.82 (p=0.001) |
+| DMH \| lateral-dorsal bin | `Galr3` | 16 / 297 (5.4%) | 34/297 | +159 vs 224 CPM — **swing wins** | −0.64 (p=0.024) |
+
+### The answer
+
+**No `Galr1` population survives.** Not one, in any of the four carvings.
+
+**The best galanin candidate in the dataset is `Gal` in ARC Agrp/Npy neurons** —
+roughly 1.7× higher in aged, found independently by the annotated-cell-type and
+fine-cluster carvings, one of only 9 genes out of 297 to pass all three filters
+in that population, and the group gap exceeds the largest within-animal section
+swing. That last point is what the DMH Galr1 lead failed.
+
+It is still not clean. `Gal` in these neurons correlates r = −0.77 with the
+rostro-caudal axis, so age and position remain collinear at n=2 per group. The
+honest status is: **the strongest galanin-system candidate this data can
+produce, and the right one to test in a properly powered, AP-matched cohort** —
+not an established ageing effect.
+
+The other 8 genes passing in ARC Agrp/Npy are `Cldn5`, `Pglyrp1`, `Igf1`,
+`Penk`, `Prss35`, `Pomc`, `Fign`, `Kcnmb2` — a plausible ageing set, which is
+mild independent support that this population is genuinely changing rather than
+the filter being noise.
+
+## 7. Ageing signature
 
 `Gfap` (+0.24), `Cd68` (+0.25), `Trem2` (+0.30 log2) up consistently in both
 blocks; `Spp1`, `Cd44`, `Igfbp5` inconsistent, `Ly6a` down. A partial glial
@@ -131,6 +179,9 @@ The atlas, the anatomical registration and the Galr1 measurement are solid. The
 biological claim is not there yet, and the reason is now specific and fixable
 rather than vague:
 
+0. **Test `Gal` in ARC Agrp/Npy neurons in a properly powered, AP-matched
+   cohort.** It is the one galanin-system candidate that survived every filter
+   the data supports. Everything else below serves this.
 1. **Match sections on rostro-caudal position.** This is the single highest-value
    change. The composition PC1 built here is already a usable AP proxy; with the
    DAPI images now available, Allen CCF registration would give a calibrated one.
