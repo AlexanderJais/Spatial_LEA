@@ -5,13 +5,15 @@ animal**, anatomically registered MBH.
 
 Pipeline: `02_qc` → `03_cluster` → `04_annotate` → `07_calibrate_anchors` →
 `08_anatomy` → `09_mbh_atlas` → `10_galr1_nucleus` → `13_spatial_domains` →
-`18_extended_nuclei` → `21_ap_correction`. Tables under `results/`.
+`18_extended_nuclei`. Tables under `results/`.
 
-> **Read §13 first.** The "effect size vs AP mismatch" correlation used in §9
-> and §11 was audited and failed. Those sections are kept for the record; their
-> AP statistics are superseded by the within-animal correction in §13, which
-> reaches the same conclusions on valid evidence and revises the `Gal` effect
-> size down from 1.59× to 1.37×.
+> **Read §13 first.** Both model-based approaches to the rostro-caudal confound
+> failed audit — the correlation used in §9 and §11 is confounded with block, and
+> the regression correction extrapolates 5.4×. Those sections are kept for the
+> record. **Use the raw per-section values in §13**, which answer the question
+> without a model: `Galr1` aged and adult ranges overlap (not separable), `Gal`
+> in ARC Agrp/Npy separates completely across all 12 sections at +0.67 log2
+> (1.59×).
 
 ---
 
