@@ -1,0 +1,79 @@
+# Sample manifest for the Xenium MBH ageing study.
+#
+# Run/slide/panel fields were read from each section's experiment.xenium.
+# Sex / age / group came from the study metadata supplied by the lab.
+#
+# Cohort A is a randomised complete block design: each batch contains one aged
+# and one adult animal, so age is NOT confounded with run day and batch can be
+# fitted as a blocking factor.
+#
+# Two acquisition cohorts are present and they are NOT interchangeable.  They
+# differ in panel design id, Xenium analysis software, segmentation algorithm
+# and transcript density, so cohort A and cohort B must not be pooled into a
+# single differential test (see docs/DATA_AUDIT.md).
+
+drive_root: https://drive.google.com/drive/folders/18VEea5Ath_wbyXeIz_PYZcgwfx6lYJZt
+
+cohorts:
+  A:
+    label: male_cohort
+    panel_design_id: 7ZBFXR
+    analysis_sw: xenium-3.3.0.1
+    segmentation: nucleus_expansion_5um
+    note: cohort used by config/roi_coordinates_male_2vs2.json
+  B:
+    label: second_cohort
+    panel_design_id: NCY734
+    analysis_sw: xenium-4.0.1.0
+    segmentation: multimodal  # nuc-expansion fraction is 0.0 for every section
+    note: no ROI export supplied yet; ~2x transcript density vs cohort A
+
+# age_weeks as supplied by the lab; age_months is derived (weeks / 4.345).
+# Design contrast: aged vs adult, blocked on `batch`.
+animals:
+  # ---- cohort A (male) -------------------------------------------------
+  F536: {cohort: A, batch: B1, run: "20250626_Run1", slide: "0014602", sex: male, age_weeks: 70, age_months: 16.1, age_group: aged}
+  M493: {cohort: A, batch: B1, run: "20250626_Run1", slide: "0014610", sex: male, age_weeks: 29, age_months: 6.7, age_group: adult}
+  G_073: {cohort: A, batch: B2, run: "20250701_Run2", slide: "0014290", sex: male, age_weeks: 65, age_months: 15.0, age_group: aged}
+  M399: {cohort: A, batch: B2, run: "20250701_Run2", slide: "0014292", sex: male, age_weeks: 30, age_months: 6.9, age_group: adult}
+  # ---- cohort B (metadata not yet supplied) ----------------------------
+  K238: {cohort: B, batch: B3, run: "20251103_Run1", slide: "0014112", sex: null, age_weeks: null, age_months: null, age_group: null}
+  P953: {cohort: B, batch: B3, run: "20251103_Run1", slide: "0014470", sex: null, age_weeks: null, age_months: null, age_group: null}
+  F739: {cohort: B, batch: B4, run: "20251106_Run2", slide: "0014141", sex: null, age_weeks: null, age_months: null, age_group: null}
+  Q378: {cohort: B, batch: B4, run: "20251106_Run2", slide: "0014174", sex: null, age_weeks: null, age_months: null, age_group: null}
+
+design:
+  primary_contrast: aged_vs_adult
+  unit_of_replication: animal      # sections are technical replicates, never n
+  blocking_factor: batch           # B1 and B2 each hold one aged + one adult
+  n_per_group: 2                   # cohort A; see docs/ANALYSIS_PLAN.md sec.9
+  confounded: none                 # age is orthogonal to batch, run day and slide
+
+# section -> {animal, drive folder id, num_cells from experiment.xenium,
+#             in_roi_export}
+sections:
+  F536_1: {animal: F536, drive_id: 1StXtcfVGS8dr2S72SnxRCfYYfksP7ei-, num_cells: 123654, in_roi_export: true}
+  F536_2: {animal: F536, drive_id: 1VjAGWvSHHflaWdM_gSq3qd2CwUtq-iFd, num_cells: 125523, in_roi_export: false}
+  F536_3: {animal: F536, drive_id: 1xgDN-dnrSntq1iUrA--eOP_Pe5doz5JV, num_cells: 127434, in_roi_export: false}
+  M493_1: {animal: M493, drive_id: 1YXoYZeAJ9RE4elutcaNNtJcPmgFkW-CN, num_cells: 129490, in_roi_export: false}
+  M493_2: {animal: M493, drive_id: 14GsrQcOg3HzLEFkzvQgmSB9N8FA6xrAr, num_cells: 109539, in_roi_export: true}
+  M493_3: {animal: M493, drive_id: 1L7eUabdTusxMNVHm0fLXaTATUA_RFRfk, num_cells: 121441, in_roi_export: false}
+  G_073_1: {animal: G_073, drive_id: 1HkTvVK_7y-QTRMqIOXmrK1Wh_9-1grwA, num_cells: 116145, in_roi_export: false}
+  G_073_2: {animal: G_073, drive_id: 1LhB4SWgsKcpcv7qkZKjZT1s7nqz_e0Ym, num_cells: 114629, in_roi_export: true, roi_key: G073_2}
+  M399_1: {animal: M399, drive_id: 11BkkqO9AAnKekqafofcxF1GYii-bKNhL, num_cells: 103258, in_roi_export: false}
+  M399_3: {animal: M399, drive_id: 1JsNOQBXnoE-LT4vP1qot91PMONZV8esM, num_cells: 104259, in_roi_export: true}
+  K238_2: {animal: K238, drive_id: 1HdQ6SnZMkdqgCl2ATAtf5ogjgfkdjO1i, num_cells: 89279, in_roi_export: false}
+  P953_1: {animal: P953, drive_id: 1GYMS7_ZZT7T8Uwc2T2N1MxAX53nFcpRD, num_cells: 90799, in_roi_export: false}
+  F739_2: {animal: F739, drive_id: 1tmvDs9BBh59eUHVY7DhjTPyLAquR-Uj5, num_cells: 123104, in_roi_export: false}
+  Q378_2: {animal: Q378, drive_id: 1BY93MoyTCmYKYdkYIXM_jM8WgLFQKCAi, num_cells: 127025, in_roi_export: false}
+
+# Files present in each Drive sample folder today.  The expression matrix is
+# NOT among them, which currently blocks every Galr1 analysis.
+available_files: [cells.parquet, features.tsv.gz, experiment.xenium]
+required_missing:
+  - cell_feature_matrix.h5   # or cell_feature_matrix/{barcodes,features,matrix}
+optional_missing:
+  - cell_boundaries.parquet
+  - nucleus_boundaries.parquet
+  - morphology_focus/        # needed for Allen CCF registration
+  - transcripts.parquet      # needed only for re-segmentation / subcellular QC

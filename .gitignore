@@ -1,0 +1,12 @@
+data/
+results/
+*.h5ad
+*.h5
+*.zarr/
+*.ome.tif
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+*.egg-info/
+.pytest_cache/
