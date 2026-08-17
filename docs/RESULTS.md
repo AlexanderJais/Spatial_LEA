@@ -4,7 +4,14 @@ Cohort A: 4 male mice (2 aged ~15–16 mo, 2 adult ~7 mo), **12 sections, 3 per
 animal**, anatomically registered MBH.
 
 Pipeline: `02_qc` → `03_cluster` → `04_annotate` → `07_calibrate_anchors` →
-`08_anatomy` → `09_mbh_atlas` → `10_galr1_nucleus`. Tables under `results/`.
+`08_anatomy` → `09_mbh_atlas` → `10_galr1_nucleus` → `13_spatial_domains` →
+`18_extended_nuclei` → `21_ap_correction`. Tables under `results/`.
+
+> **Read §13 first.** The "effect size vs AP mismatch" correlation used in §9
+> and §11 was audited and failed. Those sections are kept for the record; their
+> AP statistics are superseded by the within-animal correction in §13, which
+> reaches the same conclusions on valid evidence and revises the `Gal` effect
+> size down from 1.59× to 1.37×.
 
 ---
 
@@ -228,6 +235,10 @@ almost exactly; B1 cannot be matched at all.**
 
 ### The discrimination
 
+> **Superseded — see §13.** The correlation below is confounded with block (the
+> two blocks' AP gaps do not overlap) and its p-values are anticonservative.
+> The conclusions survive, but on the within-animal correction, not on this.
+
 Computing each candidate across *all 18 possible section pairings* and
 correlating the effect size with the AP gap separates artifact from signal:
 
@@ -308,7 +319,7 @@ nuclei are confounded with section level before any gene is examined.**
 
 Extending to LHA, ZI and DHA/PH added no robust effect. Nine candidates cleared
 the blocked filters; applying the AP test and the sampling-balance criterion
-leaves **one**:
+leaves **one** (the AP column here uses the superseded test — see §13):
 
 | nucleus | cell type | gene | LFC B1 | LFC B2 | best-matched | same-sign pairings | r vs AP gap |
 |---|---|---|---|---|---|---|---|
