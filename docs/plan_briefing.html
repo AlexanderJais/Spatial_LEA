@@ -1,0 +1,303 @@
+<title>Galr1 in the Ageing MBH</title>
+<style>
+  :root {
+    --ground: #F4F6F6;
+    --surface: #FFFFFF;
+    --surface-2: #ECF0F0;
+    --ink: #141A1B;
+    --ink-2: #3D4A4B;
+    --muted: #667677;
+    --rule: #D6DEDE;
+    --accent: #0E5A61;
+    --accent-soft: #DDECED;
+    --ok: #1C6B47;
+    --ok-soft: #DCEDE4;
+    --hold: #9A4C15;
+    --hold-soft: #F6E7D8;
+    --shadow: 0 1px 2px rgba(20, 26, 27, .06), 0 8px 24px -12px rgba(20, 26, 27, .14);
+
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1213;
+      --surface: #141B1C;
+      --surface-2: #1B2425;
+      --ink: #E5EDED;
+      --ink-2: #B6C4C4;
+      --muted: #859696;
+      --rule: #2A3536;
+      --accent: #6FCDD3;
+      --accent-soft: #10312F;
+      --ok: #6FC79A;
+      --ok-soft: #12291F;
+      --hold: #E0A468;
+      --hold-soft: #2E2013;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1213;
+    --surface: #141B1C;
+    --surface-2: #1B2425;
+    --ink: #E5EDED;
+    --ink-2: #B6C4C4;
+    --muted: #859696;
+    --rule: #2A3536;
+    --accent: #6FCDD3;
+    --accent-soft: #10312F;
+    --ok: #6FC79A;
+    --ok-soft: #12291F;
+    --hold: #E0A468;
+    --hold-soft: #2E2013;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 50rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; display: flex; flex-direction: column; gap: 3.25rem; }
+  section { display: flex; flex-direction: column; gap: 1rem; }
+
+  h1, h2, h3, .eyebrow, .chip, th, .label { font-family: var(--sans); }
+  h1 { font-size: clamp(2rem, 5vw, 2.7rem); line-height: 1.1; letter-spacing: -.022em; font-weight: 640; margin: 0; text-wrap: balance; }
+  h2 { font-size: 1.32rem; letter-spacing: -.012em; font-weight: 620; margin: 0; text-wrap: balance; }
+  h3 { font-size: 1rem; letter-spacing: -.005em; font-weight: 620; margin: 0; }
+  p { margin: 0; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+
+  .eyebrow {
+    font-size: .715rem; font-weight: 640; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .lede { font-size: 1.14rem; color: var(--ink-2); text-wrap: pretty; }
+  .rule { height: 1px; background: var(--rule); border: 0; margin: 0; }
+
+  header { display: flex; flex-direction: column; gap: 1.15rem; }
+  .meta { font-family: var(--mono); font-size: .78rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: .4rem 1.1rem; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: .45rem; align-self: flex-start;
+    font-size: .74rem; font-weight: 620; letter-spacing: .04em; text-transform: uppercase;
+    padding: .3rem .6rem; border-radius: 3px; border: 1px solid transparent;
+  }
+  .chip::before { content: ""; width: .45rem; height: .45rem; border-radius: 50%; background: currentColor; }
+  .chip-hold { color: var(--hold); background: var(--hold-soft); border-color: color-mix(in srgb, var(--hold) 28%, transparent); }
+  .chip-ok   { color: var(--ok);   background: var(--ok-soft);   border-color: color-mix(in srgb, var(--ok) 28%, transparent); }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 5px;
+    padding: 1.4rem 1.5rem; display: flex; flex-direction: column; gap: .85rem; box-shadow: var(--shadow);
+  }
+  .card-hold { border-left: 3px solid var(--hold); }
+
+  .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr)); gap: .9rem; }
+  .tile {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 5px;
+    padding: 1.05rem 1.15rem; display: flex; flex-direction: column; gap: .5rem;
+  }
+  .tile .label { font-size: .7rem; font-weight: 640; letter-spacing: .1em; text-transform: uppercase; color: var(--ok); }
+  .tile p { font-size: .93rem; color: var(--ink-2); }
+  .tile strong { color: var(--ink); font-weight: 600; }
+
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .89rem; font-variant-numeric: tabular-nums; }
+  caption { text-align: left; font-family: var(--sans); font-size: .8rem; color: var(--muted); padding-bottom: .55rem; }
+  th, td { text-align: left; padding: .5rem .8rem .5rem 0; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  th { font-size: .715rem; font-weight: 640; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  td.num { font-family: var(--mono); }
+  tbody tr:last-child td { border-bottom: 0; }
+  .aged { color: var(--hold); font-weight: 600; }
+  .adult { color: var(--accent); font-weight: 600; }
+
+  code, .gene { font-family: var(--mono); font-size: .87em; background: var(--surface-2); padding: .1rem .3rem; border-radius: 3px; }
+  .gene-hit { color: var(--accent); font-weight: 600; }
+
+  /* design block diagram */
+  .blocks { display: grid; grid-template-columns: auto 1fr 1fr; gap: .55rem; align-items: stretch; }
+  .blocks .hd { font-family: var(--sans); font-size: .7rem; font-weight: 640; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; align-items: end; padding-bottom: .2rem; }
+  .cell { background: var(--surface-2); border: 1px solid var(--rule); border-radius: 4px; padding: .7rem .85rem; display: flex; flex-direction: column; gap: .1rem; }
+  .cell .id { font-family: var(--mono); font-size: .95rem; font-weight: 600; }
+  .cell .ag { font-family: var(--sans); font-size: .76rem; color: var(--muted); }
+  .cell-aged { border-left: 3px solid var(--hold); }
+  .cell-adult { border-left: 3px solid var(--accent); }
+  .rowlab { font-family: var(--mono); font-size: .78rem; color: var(--muted); display: flex; align-items: center; }
+
+  ol.stages { list-style: none; counter-reset: st; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .1rem; }
+  ol.stages li { counter-increment: st; display: grid; grid-template-columns: 2.1rem 1fr; gap: .9rem; padding: .8rem 0; border-bottom: 1px solid var(--rule); }
+  ol.stages li:last-child { border-bottom: 0; }
+  ol.stages li::before {
+    content: counter(st); font-family: var(--mono); font-size: .78rem; font-weight: 600;
+    color: var(--accent); background: var(--accent-soft); border-radius: 3px;
+    height: 1.6rem; display: flex; align-items: center; justify-content: center;
+  }
+  ol.stages .st-body { display: flex; flex-direction: column; gap: .2rem; }
+  ol.stages .st-body p { font-size: .92rem; color: var(--ink-2); }
+
+  dl.abc { margin: 0; display: flex; flex-direction: column; gap: .9rem; }
+  dl.abc > div { display: grid; grid-template-columns: 1.7rem 1fr; gap: .9rem; }
+  dl.abc dt { font-family: var(--mono); font-weight: 700; color: var(--accent); }
+  dl.abc dd { margin: 0; font-size: .95rem; }
+  dl.abc dd em { color: var(--muted); font-style: normal; display: block; font-size: .87rem; font-family: var(--sans); margin-top: .15rem; }
+
+  ul.asks { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .75rem; }
+  ul.asks li { display: grid; grid-template-columns: auto 1fr; gap: .8rem; align-items: baseline; font-size: .95rem; }
+  ul.asks .n { font-family: var(--mono); font-size: .78rem; color: var(--muted); }
+
+  footer { font-family: var(--sans); font-size: .82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 1.5rem; }
+  @media (max-width: 34rem) {
+    .blocks { grid-template-columns: 1fr; }
+    .blocks .hd { display: none; }
+    .rowlab { padding-top: .5rem; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Analysis plan &middot; Xenium spatial transcriptomics</div>
+    <h1>Galanin receptor signalling in the ageing mediobasal hypothalamus</h1>
+    <p class="lede">Which MBH cell types change their <span class="gene gene-hit">Galr1</span> expression between mature adult and middle-aged male mice — and is the change confined to particular nuclei, such as the DMH?</p>
+    <div class="meta">
+      <span>4 animals &middot; 2 aged / 2 adult</span>
+      <span>297-gene mBrain panel</span>
+      <span>40,863 MBH cells</span>
+      <span>17 Aug 2026</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="card card-hold">
+      <span class="chip chip-hold">Blocked — one file type missing</span>
+      <h2>The expression matrix is not in the shared folder</h2>
+      <p>All 14 sample folders contain exactly three files: <code>cells.parquet</code>, <code>features.tsv.gz</code> and <code>experiment.xenium</code>. <code>cells.parquet</code> holds <em>per-cell transcript totals</em> — not per-gene counts.</p>
+      <p>Galr1 cannot be measured and cell types cannot be called without <code>cell_feature_matrix.h5</code> (≈50–150&nbsp;MB per section, ≈1.5&nbsp;GB for all 14). Dropping it into the existing Drive folders is enough; the fetch script picks up whatever is present.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Already settled</div>
+    <h2>Three things verified directly against the data</h2>
+    <div class="grid-3">
+      <div class="tile">
+        <span class="label">Panel</span>
+        <p><strong>Galr1 and Galr3 are on the panel</strong>, together with the ligand <span class="gene">Gal</span>. <span class="gene">Galr2</span> is absent. The question is answerable — and a ligand–receptor story is available, not just a receptor count.</p>
+      </div>
+      <div class="tile">
+        <span class="label">Design</span>
+        <p><strong>Age is orthogonal to batch.</strong> Each run day carries one aged and one adult animal, so nothing needs deconfounding — the best-case outcome for a 2&nbsp;vs&nbsp;2 layout.</p>
+      </div>
+      <div class="tile">
+        <span class="label">ROI</span>
+        <p><strong>The transform convention is solved exactly.</strong> Rotating centroids by <code>+rotation_deg</code> about the pivot reproduces every recorded cell count with zero error.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <div class="eyebrow">Study design</div>
+    <h2>A randomised complete block design</h2>
+    <p>Age is orthogonal to run day, slide and cassette. Each batch yields one independent aged−adult contrast, and agreement between the two blocks is the strongest evidence this design can produce.</p>
+    <div class="blocks">
+      <div></div>
+      <div class="hd">Aged</div>
+      <div class="hd">Adult</div>
+
+      <div class="rowlab">B1 · 26 Jun</div>
+      <div class="cell cell-aged"><span class="id">F536</span><span class="ag">70 weeks · 16.1 mo</span></div>
+      <div class="cell cell-adult"><span class="id">M493</span><span class="ag">29 weeks · 6.7 mo</span></div>
+
+      <div class="rowlab">B2 · 01 Jul</div>
+      <div class="cell cell-aged"><span class="id">G_073</span><span class="ag">65 weeks · 15.0 mo</span></div>
+      <div class="cell cell-adult"><span class="id">M399</span><span class="ag">30 weeks · 6.9 mo</span></div>
+    </div>
+    <div class="card">
+      <h3>One framing caveat worth pre-empting</h3>
+      <p style="font-size:.95rem">By the NIA/JAX convention for C57BL/6 — adult 3–6&nbsp;mo, middle-aged 10–14&nbsp;mo, old 18–24&nbsp;mo — the two "aged" animals at 15.0 and 16.1 months are <strong>middle-aged</strong>. The contrast is real and hypothalamic ageing phenotypes do begin in middle age, but the ages should appear in the abstract and the claim be scoped to mid-life onset. An 18–24&nbsp;mo group later would turn the caveat into a trajectory.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">ROI validation</div>
+    <h2>Cell selection reproduces the recorded counts exactly</h2>
+    <div class="scroll">
+      <table>
+        <caption>Rotating centroids by +rotation_deg about the pivot, then applying the polygon. Alternative conventions do not match.</caption>
+        <thead><tr><th>Section</th><th>Rotation</th><th>Expected</th><th>No transform</th><th>+deg</th><th>−deg</th></tr></thead>
+        <tbody>
+          <tr><td class="num">M493_2</td><td class="num">+1.0°</td><td class="num">10,291</td><td class="num">10,287</td><td class="num" style="color:var(--ok);font-weight:600">10,291</td><td class="num">10,299</td></tr>
+          <tr><td class="num">F536_1</td><td class="num">—</td><td class="num">11,614</td><td class="num" style="color:var(--ok);font-weight:600">11,614</td><td class="num">—</td><td class="num">—</td></tr>
+          <tr><td class="num">G073_2</td><td class="num">—</td><td class="num">8,592</td><td class="num" style="color:var(--ok);font-weight:600">8,592</td><td class="num">—</td><td class="num">—</td></tr>
+          <tr><td class="num">M399_3</td><td class="num">−2.5°</td><td class="num">10,366</td><td class="num">10,410</td><td class="num" style="color:var(--ok);font-weight:600">10,366</td><td class="num">10,610</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:.93rem;color:var(--ink-2)">The rectangles are generous — they contain ARC, VMH, DMH and ME <em>plus</em> surrounding LHA, PH and TU. Sub-nucleus assignment inside the ROI is what the DMH question rests on, so it is not a detail.</p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <div class="eyebrow">Pipeline · stages run in dependency order</div>
+    <h2>How the analysis proceeds</h2>
+    <ol class="stages">
+      <li><div class="st-body"><h3>QC with negative-control calibration</h3><p>The 27 negative-control probes and 41 negative-control codewords give a per-section false-detection rate. This sets the threshold for what counts as a real Galr1 transcript — the question always asked of a low-abundance GPCR.</p></div></li>
+      <li><div class="st-body"><h3>Does the tissue actually look older?</h3><p><span class="gene">Gfap</span>, <span class="gene">Cd68</span>, <span class="gene">Trem2</span>, <span class="gene">Spp1</span>, <span class="gene">Cd44</span> should rise in the aged animals. Run early and cheaply — if the canonical ageing signature is absent, that reframes everything downstream.</p></div></li>
+      <li><div class="st-body"><h3>Cell typing by three independent routes</h3><p>Label transfer from <strong>HypoMap</strong> (384,925 hypothalamic cells), from the <strong>Allen ABC atlas</strong>, and unsupervised Leiden with manual marker annotation. Cells kept where routes agree; concordance reported.</p></div></li>
+      <li><div class="st-body"><h3>Nucleus assignment, also triangulated</h3><p>The panel lacks <span class="gene">Nr5a1</span>, <span class="gene">Tbx3</span> and <span class="gene">Trh</span>, so markers alone cannot call nuclei. Allen CCF registration, ABC-atlas spatial mapping and Banksy spatial domains, reconciled — plus a <strong>continuous</strong> frame (distance to 3rd ventricle, dorsoventral depth) that is immune to registration error.</p></div></li>
+      <li><div class="st-body"><h3>The Galr1 analysis</h3><p>Three separable claims, tested separately — see below. Run in parallel for <span class="gene">Galr3</span> and the ligand <span class="gene">Gal</span>, because a shift in ligand–receptor <em>balance</em> is a stronger result than a receptor count.</p></div></li>
+      <li><div class="st-body"><h3>Spatial and circuit analyses</h3><p>Gal→Galr1 neighbourhood coupling, Galr1 as a spatial gradient along the ventricular axis, niche composition around Galr1⁺ DMH neurons. This is what separates a spatial paper from a dissociated-tissue paper.</p></div></li>
+      <li><div class="st-body"><h3>Robustness battery</h3><p>Leave-one-animal-out, section-level replication, exact blocked permutation, threshold and segmentation sensitivity, negative-control genes, and a power curve for n&nbsp;=&nbsp;2/3/5/8. Reported whether or not it is flattering.</p></div></li>
+    </ol>
+  </section>
+
+  <section>
+    <div class="eyebrow">The intellectual core</div>
+    <h2>"Galr1 changed" is three different claims</h2>
+    <p>Reporting a shift without separating these is the most common way an in-situ receptor paper gets sent back.</p>
+    <dl class="abc">
+      <div><dt>A</dt><dd>A different <strong>fraction of cells</strong> expresses Galr1.<em>Per-animal detection rate per cell type × nucleus, against a background-calibrated threshold.</em></dd></div>
+      <div><dt>B</dt><dd>The <strong>same cells express more or less</strong> Galr1.<em>Pseudobulk per animal × cell type × nucleus; negative binomial with a total-count offset, <code>~ age + batch</code>.</em></dd></div>
+      <div><dt>C</dt><dd>The <strong>abundance of Galr1-high cell types</strong> changed.<em>Compositional analysis — a different finding entirely, and one that can masquerade as A or B.</em></dd></div>
+    </dl>
+  </section>
+
+  <section>
+    <div class="eyebrow">Statistics</div>
+    <h2>The honest power position</h2>
+    <div class="card">
+      <p>With 2 vs 2 in a blocked design, the exact permutation null has only four label assignments. The observed assignment and its mirror are indistinguishable, so <strong>the smallest attainable exact two-sided p-value is 0.5</strong> — for any gene, however large the effect. No analysis choice changes this.</p>
+      <hr class="rule">
+      <p style="font-size:.95rem"><strong>What this cohort delivers:</strong> a rigorously annotated spatial atlas, per-animal effect sizes with confidence intervals, replication across two independent batches and across sections, and a ranked shortlist of cell&nbsp;type&nbsp;×&nbsp;nucleus hypotheses.</p>
+      <p style="font-size:.95rem"><strong>What a high-impact claim additionally needs:</strong> the second cohort as independent replication, or more animals (n&nbsp;≥&nbsp;5 per group makes standard pseudobulk testing meaningful), or orthogonal validation of top hits by RNAscope — which such journals expect for an in-situ receptor claim regardless of n.</p>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <div class="eyebrow">To proceed</div>
+    <h2>What I need from you</h2>
+    <ul class="asks">
+      <li><span class="n">01</span><span><strong>The expression matrices.</strong> <code>cell_feature_matrix.h5</code> per section. Everything else is blocked on this. Boundaries and DAPI images are valuable too — DAPI is what makes proper Allen CCF registration, and therefore confident nucleus labels, possible.</span></li>
+      <li><span class="n">02</span><span><strong>Ages and groups for the second cohort</strong> — K238, P953, F739, Q378. On Drive they sit under a folder named "Female", so sex is confounded with platform version and no sex claim is available. But if that cohort is also adult vs aged, it becomes an <em>independent replication set processed on a different pipeline version</em> — worth more to the power position above than a sex comparison would be.</span></li>
+      <li><span class="n">03</span><span><strong>ROIs for the remaining sections.</strong> The export covers one section per animal; six more exist. Either you draw them, or we propagate the existing ROI by landmark registration and you approve the result.</span></li>
+    </ul>
+  </section>
+
+  <footer>
+    Full factual basis in <code>docs/DATA_AUDIT.md</code>; complete plan in <code>docs/ANALYSIS_PLAN.md</code>. ROI selection is implemented in <code>src/spatial_lea/roi.py</code> and locked down by tests that fail if the transform convention is broken.
+  </footer>
+
+</div>

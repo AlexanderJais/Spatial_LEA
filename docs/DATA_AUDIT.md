@@ -89,6 +89,15 @@ segmentation algorithm. Pooling A and B into one differential test would put a
 as **independent cohorts that replicate each other**, which is scientifically
 stronger than pooling anyway — but not as one merged dataset.
 
+On Drive, the four cohort-B sections sit under a folder named `Female`, while
+cohort A is confirmed male. If that layout reflects sex, then **sex is
+confounded with platform version** in this dataset: a sex difference could not
+be claimed, and neither could a sex × age interaction. What *can* be claimed —
+and is arguably worth more — is that an age effect **replicates in an
+independent cohort processed with a different software version and a different
+segmentation algorithm.** That is a robustness argument a reviewer will accept.
+Cohort B ages and groups are still needed to know whether this is available.
+
 ### Run structure within cohort A — the design is properly blocked
 
 | batch | run | slide | animal | age | group | sections |

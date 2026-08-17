@@ -36,11 +36,13 @@ animals:
   M493: {cohort: A, batch: B1, run: "20250626_Run1", slide: "0014610", sex: male, age_weeks: 29, age_months: 6.7, age_group: adult}
   G_073: {cohort: A, batch: B2, run: "20250701_Run2", slide: "0014290", sex: male, age_weeks: 65, age_months: 15.0, age_group: aged}
   M399: {cohort: A, batch: B2, run: "20250701_Run2", slide: "0014292", sex: male, age_weeks: 30, age_months: 6.9, age_group: adult}
-  # ---- cohort B (metadata not yet supplied) ----------------------------
-  K238: {cohort: B, batch: B3, run: "20251103_Run1", slide: "0014112", sex: null, age_weeks: null, age_months: null, age_group: null}
-  P953: {cohort: B, batch: B3, run: "20251103_Run1", slide: "0014470", sex: null, age_weeks: null, age_months: null, age_group: null}
-  F739: {cohort: B, batch: B4, run: "20251106_Run2", slide: "0014141", sex: null, age_weeks: null, age_months: null, age_group: null}
-  Q378: {cohort: B, batch: B4, run: "20251106_Run2", slide: "0014174", sex: null, age_weeks: null, age_months: null, age_group: null}
+  # ---- cohort B --------------------------------------------------------
+  # sex inferred from the Drive layout (these four sit under a folder named
+  # "Female"); ages and groups not yet supplied.  Confirm before use.
+  K238: {cohort: B, batch: B3, run: "20251103_Run1", slide: "0014112", sex: female?, age_weeks: null, age_months: null, age_group: null}
+  P953: {cohort: B, batch: B3, run: "20251103_Run1", slide: "0014470", sex: female?, age_weeks: null, age_months: null, age_group: null}
+  F739: {cohort: B, batch: B4, run: "20251106_Run2", slide: "0014141", sex: female?, age_weeks: null, age_months: null, age_group: null}
+  Q378: {cohort: B, batch: B4, run: "20251106_Run2", slide: "0014174", sex: female?, age_weeks: null, age_months: null, age_group: null}
 
 design:
   primary_contrast: aged_vs_adult

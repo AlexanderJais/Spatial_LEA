@@ -43,9 +43,12 @@ dropping the files into the existing Drive folders is enough.
 
 ### 1.2 Decisions worth making now
 
-1. **Cohort B metadata.** K238, P953, F739, Q378 (Nov 2025) — sex, ages, groups.
-   If that cohort is also adult vs aged it becomes an independent replication
-   set, which matters a great deal for §9.
+1. **Cohort B metadata.** K238, P953, F739, Q378 (Nov 2025) — ages and groups.
+   On Drive they sit under a folder named `Female`; if that is right, sex is
+   confounded with platform version, so no sex claim is available — but if the
+   cohort is also adult vs aged it becomes an **independent replication set
+   processed on a different pipeline version**, which is worth more to §2 than a
+   sex comparison would be.
 2. **ROIs for the remaining sections.** The export covers 1 section per animal;
    6 more exist (F536 ×2, M493 ×2, G_073 ×1, M399 ×1). Adding them stabilises
    each animal's estimate. Either you draw them, or we propagate the existing
