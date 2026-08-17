@@ -1,0 +1,48 @@
+gene,alias,tier,category,rationale,priority,expression_risk
+Kcnj3,GIRK1,1,GIRK effector,Galr1 hyperpolarises via GIRK; reduced channel = weaker response at unchanged receptor,high,low
+Kcnj6,GIRK2,1,GIRK effector,dominant neuronal GIRK subunit,high,low
+Kcnj9,GIRK3,1,GIRK effector,modulates GIRK trafficking and desensitisation,high,low
+Grk2,Adrbk1,1,receptor kinase,phosphorylates agonist-occupied GPCRs; upregulation is a classic resistance mechanism,high,low
+Grk3,Adrbk2,1,receptor kinase,main partner to GRK2 for Gi-coupled receptors,high,low
+Grk5,,1,receptor kinase,slower membrane-anchored desensitisation arm,medium,low
+Arrb1,beta-arrestin 1,1,arrestin,desensitisation and receptor internalisation,high,low
+Arrb2,beta-arrestin 2,1,arrestin,determines receptor availability at the membrane,high,low
+Rgs4,,1,Galpha GAP,broadly hypothalamic; accelerates Gi signal termination,high,low
+Rgs7,,1,Galpha GAP R7,with Gbeta5 sets GIRK deactivation kinetics,high,low
+Rgs9,,1,Galpha GAP R7,as Rgs7; GIRK kinetics,medium,low
+Rgs2,,1,Galpha GAP,activity-regulated; links neuronal state to GPCR gain,medium,low
+Rgs20,,1,Galpha-o selective GAP,most Galr1-relevant RGS by coupling specificity,medium,moderate
+Gnb5,Gbeta5,1,RGS partner,obligate partner of R7-family RGS; needed to interpret Rgs7/Rgs9,high,low
+Gnao1,Galpha-o,2,G protein,dominant neuronal Galpha and Galr1 principal transducer,high,low
+Gnai1,,2,G protein,Gi transducer,medium,low
+Gnai2,,2,G protein,Gi transducer,medium,low
+Adcy5,,2,effector,adenylyl cyclase inhibited by Gi,medium,low
+Pde10a,,2,effector,cAMP degradation; striatal-hypothalamic,low,low
+Prkaca,,2,effector,PKA catalytic subunit,low,low
+Galr2,,3,galanin receptor,"HIGHEST VALUE: Gq-coupled and excitatory, opposite sign to Galr1/Galr3, entirely absent from current panel",critical,moderate
+Galp,,3,galanin ligand,galanin-like peptide; arcuate-specific second endogenous ligand,high,moderate
+Spx,spexin,3,galanin ligand,endogenous Galr2/Galr3 ligand,medium,high
+Kcnj5,GIRK4,3,GIRK effector,completes the channel family,low,low
+Rgs17,,3,Galpha GAP,further Gi-family GAP,low,moderate
+Rgs10,,3,Galpha GAP,further Gi-family GAP,low,low
+Rgs19,,3,Galpha GAP,further Gi-family GAP,low,low
+Nr5a1,SF-1,4,nucleus marker,VMH definitive marker; currently absent so VMH is inferred from Adcyap1,critical,low
+Tbx3,,4,nucleus marker,ARC definitive marker; currently absent,critical,low
+Sim1,,4,nucleus marker,PVN and DMH,high,low
+Foxb1,,4,nucleus marker,mammillary/premammillary and an AP landmark,high,low
+Rax,,4,nucleus marker,tanycytes and ventricular zone,medium,low
+Nkx2-1,,4,nucleus marker,ventral hypothalamic territory,medium,low
+Lhx6,,4,nucleus marker,zona incerta; would settle the ZI assignment directly,high,low
+Trh,,4,nucleus marker,PVN and DMH,medium,low
+Pmch,,4,nucleus marker,LHA; currently the LHA rests on Hcrt alone,high,low
+Kiss1,,4,nucleus marker,ARC KNDy; the population the current nucleus model assigns worst (7.5%),high,moderate
+Npas4,,5,activity readout,activity-specific immediate-early gene not driven by stress,high,low
+Egr1,,5,activity readout,immediate-early gene,medium,low
+Junb,,5,activity readout,immediate-early gene,medium,low
+Fosb,,5,activity readout,slower immediate-early window than Fos,medium,low
+Nr4a1,,5,activity readout,immediate-early gene,medium,low
+C1qa,,6,ageing/inflammation,complement; well-established ageing readout,high,low
+C1qb,,6,ageing/inflammation,complement,medium,low
+B2m,,6,ageing/inflammation,MHC-I; robust ageing marker,high,low
+Cd74,,6,ageing/inflammation,MHC-II invariant chain,medium,low
+Ctss,,6,ageing/inflammation,microglial cathepsin S,medium,low
