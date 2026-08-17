@@ -6,7 +6,11 @@
 # Baysor v0.7.1 (the Julia line, Petukhov et al. 2022) is run from source rather
 # than the released binary: this container cannot reach GitHub releases, but it
 # can clone the repository and resolve the Julia dependencies, so the package is
-# installed from a v0.7.1 worktree.  BAYSOR_HOME must point at that worktree.
+# installed from a v0.7.1 worktree.  scripts/setup_baysor.sh builds that worktree
+# and applies patches/baysor-0.7.1-skip-ncv-colors.patch, which is required at
+# this data size -- without it the run finishes segmenting and is then OOM-killed
+# in a plotting-only step, before writing anything.  BAYSOR_HOME must point at
+# the patched worktree.
 #
 # Parameters and why:
 #
