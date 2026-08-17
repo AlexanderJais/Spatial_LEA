@@ -140,3 +140,85 @@ and it is a claim this design can support, unlike a per-gene age difference.
    variance components here show section-to-section anatomical variation
    (SD 0.265 log2) exceeds between-animal biological variation (0.152) — that
    applies to a treatment contrast just as much as to an age contrast.
+
+---
+
+# The galanin-resistance hypothesis
+
+Resistance predicts a specific shape — the one that defines leptin resistance:
+**ligand rises while receptor stays flat or falls**, so the ligand-to-receptor
+balance shifts and the same signalling needs more ligand. Tested gene by gene
+that is hopeless at n=2; tested as an **ensemble** it is not, because the unit
+becomes the population rather than the animal. `23_galanin_resistance.py` runs
+it over 64 populations with AP-corrected effects, calibrated against all 293
+panel genes.
+
+## Six tests, all negative
+
+| test | result |
+|---|---|
+| **Ensemble shift** — is `Gal` displaced up and `Galr1` not? | `Gal` median LFC **+0.007** (48th percentile of the panel), `Galr1` **−0.018** (55th). Both sit in the middle of the panel distribution. |
+| **Resistance index** — LFC(`Gal`) − LFC(`Galr1`) per population | Positive in **12/29 populations (41%)**, median **−0.15**. Against random gene pairs from the same populations: one-sidedness p = 0.58, magnitude p = 0.50 — indistinguishable from noise. |
+| **Paired within population** | Wilcoxon p = 0.73. |
+| **Spatial coupling** — local `Gal` available to each `Galr1`⁺ cell | aged 1.09–1.35, adult 1.09–1.42. Completely overlapping. |
+| **Activity set-point** — failing inhibition should raise activity in `Galr1`⁺ cells | `Fos` aged/adult ratio **0.73**, `Arc` 0.84, `Bdnf` 0.93, `Nrn1` 0.97. If anything the drift is *downward* — the opposite of disinhibition. |
+| **Autoreceptor coverage** — do `Gal`⁺ cells keep their own receptor? | 27.4% aged vs 26.4% adult, ratio **1.04**. No loss. |
+
+**There is no transcriptional signature of galanin resistance in this dataset.**
+
+The ensemble tests carry more weight than the per-gene ones. Their unit is the
+population (n = 29–52), not the animal, so they are far better powered than the
+~11-fold minimum detectable effect that limits a single age contrast — and they
+are calibrated against random gene pairs rather than a nominal p-value. This is
+a more informative negative than the per-gene nulls elsewhere in the project.
+
+## Why that does not refute the hypothesis
+
+**Pharmacological resistance is usually post-transcriptional, and Xenium sees
+transcripts.** The mechanisms that actually produce a blunted agonist response —
+receptor internalisation, GRK/β-arrestin desensitisation, G-protein uncoupling,
+RGS upregulation, GIRK channel changes — are largely invisible at the mRNA
+level, and the few with transcriptional components (`Rgs*`, `Grk*`, `Arrb*`,
+`Kcnj*`) are not on this 297-gene panel at all.
+
+So a null here means something narrower but still useful: **if galanin
+resistance exists in these animals, it is not because receptor transcript is
+lost, nor because the ligand-to-receptor transcript balance has shifted.**
+
+## What this gives the M617 experiment
+
+This is the constructive form of the negative, and it is a genuine constraint to
+have in hand *before* the treatment reads out:
+
+> If M617 produces a blunted response in aged mice, this dataset argues the
+> cause is **not** reduced receptor availability, **not** loss of receptor from
+> galanin-producing cells, and **not** a ligand–receptor imbalance in
+> transcript abundance. The mechanism would have to sit downstream of receptor
+> expression — coupling, desensitisation, effector state or circuit context.
+
+That is exactly where the field usually finds resistance, and it narrows the
+follow-up considerably.
+
+### What would actually test resistance
+
+1. **Dose–response to M617** — a rightward EC50 shift in aged animals is the
+   definition of resistance, and it is the experiment you are already running.
+   A Bmax/Kd separation by receptor binding would then say whether it is
+   receptor number or receptor affinity/coupling.
+2. **Proximal signalling readout, not transcript** — pERK, pCREB, or GIRK
+   currents in `Galr1`⁺ DMH neurons after M617. This is the layer where
+   resistance lives.
+3. **A panel that can see the machinery** — if a future spatial run is planned,
+   adding `Rgs2`/`Rgs4`, `Grk2`/`Grk5`, `Arrb1`/`Arrb2` and GIRK subunits
+   (`Kcnj3`, `Kcnj6`, `Kcnj9`) would make the desensitisation axis visible.
+   The current panel simply cannot address it.
+4. **Read out where the receptor is** — DMH and LHA carry 60% of it, ARC 0.7%.
+
+## One positive finding worth keeping
+
+`Galr1`⁺ cells sit in **`Gal`-enriched neighbourhoods in all 12 sections**
+(enrichment 1.09–1.42, every section above 1). Ligand and receptor are
+spatially organised rather than independently distributed — the receptor is
+positioned where the ligand is made. That is a Tier 1 descriptive result,
+replicated in every section and independent of age, and it is a reasonable
+figure for the paper regardless of how the resistance question resolves.
