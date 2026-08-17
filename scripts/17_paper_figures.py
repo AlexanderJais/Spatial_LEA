@@ -278,14 +278,27 @@ def figure3(atlas) -> None:
 
 # ---------------------------------------------------------------- figure 4
 def figure4(dom, ap) -> None:
-    pairings = _all_pairings(dom, ap)
-    pairings.to_csv(SRC / "fig4_all_pairings.csv", index=False)
+    """The rostro-caudal confound, via the within-animal AP correction.
+
+    The earlier version of this figure used a correlation between effect size
+    and the AP mismatch of each section pairing.  That diagnostic failed audit
+    (20_audit_ap_test.py): the AP gaps in the two blocks do not overlap, so the
+    correlation tested a block difference, the pairings share sections so the
+    p-value was anticonservative, and 38% of the panel fired at p<0.05.  The
+    within-animal slope used here is estimated where age is constant, so it
+    cannot be confounded with the age effect it is correcting.
+    """
+    corr = pd.read_csv(REPO / "results" / "ap_correction" / "ap_corrected_candidates.csv")
+    panel_gal = pd.read_csv(
+        REPO / "results" / "ap_correction" / "panel_ARC_Agrp_Npy.csv", index_col=0)
+    panel_galr1 = pd.read_csv(
+        REPO / "results" / "ap_correction" / "panel_GABA_Gal_Galr1.csv", index_col=0)
     vc = pd.read_csv(REPO / "results" / "power" / "variance_components.csv")
 
-    fig, axes = plt.subplots(1, 4, figsize=(8.4, 2.6))
-    fig.subplots_adjust(wspace=.72)
+    fig, axes = plt.subplots(1, 4, figsize=(8.6, 2.7))
+    fig.subplots_adjust(wspace=.78)
 
-    ax = axes[0]; panel_label(ax, "a", dx=-0.30)
+    ax = axes[0]; panel_label(ax, "a", dx=-0.34)
     for animal, sub in ap.groupby("animal"):
         sub = sub.sort_values("idx")
         ax.plot(sub["idx"], sub["ap_score"], "-o", ms=3.5, lw=1,
@@ -295,24 +308,31 @@ def figure4(dom, ap) -> None:
                     va="center", clip_on=False)
     ax.set_xlabel("section (cut order)"); ax.set_ylabel("AP score")
     ax.set_xticks([1, 2, 3]); ax.set_xlim(.7, 3.6)
-    ax.set_title("Morphometric\nAP score", loc="left")
+    ax.set_title("Morphometric\nAP score", loc="left", fontsize=8)
 
-    for ax, (gene, ct, letter) in zip(
-        axes[1:3], [("Galr1", "GABA Gal/Galr1", "b"), ("Gal", "ARC Agrp/Npy", "c")]
-    ):
-        panel_label(ax, letter)
-        sub = pairings[(pairings.gene == gene) & (pairings.cell_type == ct)]
-        ax.scatter(sub["ap_gap"], sub["lfc"], s=18,
-                   c=[GRP_COLOUR["aged"] if b == "B1" else GRP_COLOUR["adult"] for b in sub["block"]])
-        if len(sub) > 3:
-            r, p = st.pearsonr(sub["ap_gap"], sub["lfc"])
-            z = np.polyfit(sub["ap_gap"], sub["lfc"], 1)
-            xs = np.linspace(0, sub["ap_gap"].max(), 20)
-            ax.plot(xs, np.polyval(z, xs), color="#333", lw=1, ls="--")
-            short = "Galr1, DMH Gal/Galr1" if gene == "Galr1" else "Gal, ARC Agrp/Npy"
-            ax.set_title(f"{short}\nr = {r:+.2f}, p = {p:.3f}", loc="left", fontsize=8)
-        ax.axhline(0, color="#999", lw=.8)
-        ax.set_xlabel("AP mismatch"); ax.set_ylabel("log2 aged / adult")
+    ax = axes[1]; panel_label(ax, "b")
+    labels, raws, corrs = [], [], []
+    for _, r in corr.iterrows():
+        labels.append(f"{r['gene']}\n{r['cell_type'].split()[0]}")
+        raws.append(r["raw_mean"]); corrs.append(r["corr_mean"])
+    x = np.arange(len(labels))
+    ax.bar(x - .19, raws, .36, color="#9A4C15", label="raw")
+    ax.bar(x + .19, corrs, .36, color="#0E5A61", label="AP-corrected")
+    ax.axhline(0, color="#555", lw=.8)
+    ax.set_xticks(x); ax.set_xticklabels(labels, fontsize=6)
+    ax.set_ylabel("log2 aged / adult")
+    ax.legend(frameon=False, fontsize=6)
+    ax.set_title("Effect before and after\ncorrection", loc="left", fontsize=8)
+
+    ax = axes[2]; panel_label(ax, "c")
+    ax.hist(panel_galr1["shrinkage"] * 100, bins=35, color="#DCE2E2", label="panel")
+    ax.axvline(corr[corr.gene == "Galr1"]["shrinkage_pct"].iloc[0], color="#B4531A", lw=1.8)
+    ax.axvline(corr[corr.cell_type == "ARC Agrp/Npy"]["shrinkage_pct"].iloc[0],
+               color="#0E5A61", lw=1.8)
+    ax.set_xlabel("% of effect removed")
+    ax.set_ylabel("panel genes")
+    ax.set_title("Galr1 93.6% removed (top 5%)\nGal 32.6% (typical)",
+                 loc="left", fontsize=7.5)
 
     ax = axes[3]; panel_label(ax, "d")
     lbl = ["between\nsections", "between\nanimals"]
@@ -324,7 +344,7 @@ def figure4(dom, ap) -> None:
     ax.text(.5, max(vals) * 1.20, "anatomical noise\nexceeds biology",
             ha="center", fontsize=6, color="#444")
 
-    fig.suptitle("Figure 4 — Rostro-caudal mismatch generates apparent age effects",
+    fig.suptitle("Figure 4 — Rostro-caudal position accounts for the apparent Galr1 effect",
                  x=.02, ha="left", fontsize=10, fontweight="bold", y=1.12)
     save(fig, "figure4_ap_confound")
 
@@ -396,7 +416,7 @@ def figure5(dom, ap) -> None:
     sub = pair[(pair.gene == "Gal") & (pair.cell_type == ct)].sort_values("ap_gap")
     ax.scatter(range(len(sub)), sub["lfc"], s=18, c="#0E5A61")
     ax.axhline(0, color="#999", lw=.8)
-    ax.set_xlabel("section pairings")
+    ax.set_xlabel("section pairings (descriptive)")
     ax.set_ylabel("log2 aged / adult")
     ax.set_title(f"positive in {int((sub.lfc>0).sum())}/{len(sub)}\npairings", loc="left")
 

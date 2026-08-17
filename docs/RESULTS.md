@@ -325,7 +325,57 @@ DHA/PH glutamatergic neurons (r = +0.56, p = 0.016) and in DHA/PH overall
 the best-matched pairing (DHA/PH `Gal`: +2.02/+2.79 overall, +0.37 matched) and
 sit in nuclei with 30–49% sampling CV, so they are not pursued.
 
-## 12. Ageing signature
+## 13. Audit of the AP test — and its replacement
+
+The "effect size vs AP mismatch" correlation used in §9 and §11 was audited
+(`20_audit_ap_test.py`) and **found to be untrustworthy**. Three failures:
+
+| check | result |
+|---|---|
+| Is AP mismatch confounded with block? | **Yes, completely.** B1 pairings span gaps 2.36–4.94, B2 spans 0.04–2.00 — no overlap, separation AUC = 1.00. "Large gap" *means* "block B1", so the pooled correlation tests a block difference, not an AP effect. |
+| Are the 18 pairings independent? | **No.** They are built from 12 sections, each appearing in three pairings. A permutation null that shuffles AP within animal gives `Galr1` **p = 0.062**, against the naive **p = 0.002** — anticonservative by ~40×. |
+| Is the test calibrated? | **No.** 77 of 205 tested genes (**38%**) fire at naive p < 0.05 in ARC Agrp/Npy, against the 5% a calibrated test would give. Median \|r\| across the panel is 0.36. |
+
+**Corrections to earlier statements.** The `Galr1` AP correlation was reported as
+r = −0.69, p = 0.002; the correct nesting-aware p is **0.062**. The claim that
+`Gal` in ARC Agrp/Npy is "AP-independent (p = 0.63)" rested on the same
+miscalibrated test and carries little weight on its own.
+
+### The replacement: within-animal AP correction
+
+Age is constant inside an animal, so any dependence of expression on
+rostro-caudal level measured *within* animals is anatomical by construction and
+cannot be confounded with age. Fitting `log2 CPM ~ AP + animal` over the 12
+sections isolates that common within-animal slope; each section is then
+corrected to a common AP level and the blocked age effect recomputed
+(`21_ap_correction.py`). Shrinkage is calibrated against every panel gene in the
+same population.
+
+| gene / population | AP slope | raw effect | corrected | removed | panel rank | verdict |
+|---|---|---|---|---|---|---|
+| `Galr1`, DMH GABA Gal/Galr1 | −0.216 (p = 0.085) | −0.48 | **+0.03** | **93.6%** | top 5.4% | **largely anatomical** |
+| `Gal`, ARC Agrp/Npy | +0.091 (p = 0.49) | +0.67 | **+0.45** | 32.6% | 22.4% | **survives** |
+| `Gal`, DMH GABA Cacna2d2 | +0.140 (p = 0.40) | +0.46 | +0.13 | 72.4% | 12.6% | largely anatomical |
+
+The conclusions hold, on better evidence:
+
+- **`Galr1` in DMH Gal/Galr1 neurons is anatomical.** Correction removes 93.6%
+  of the effect and flips its sign; only 5.4% of panel genes shrink as much. The
+  original conclusion was right; the statistic supporting it was not.
+- **`Gal` in ARC Agrp/Npy survives**, but at a **smaller effect than previously
+  reported: log2 +0.45 (1.37×), not +0.67 (1.59×)**, with the sign preserved in
+  both blocks and a shrinkage typical of the panel.
+- **`Gal` in DMH GABA Cacna2d2 falls.** 72.4% removed and the sign flips in B1;
+  it should be dropped from the candidate list.
+
+### Consequence for power
+
+The corrected effect of +0.45 log2 requires a larger cohort than the raw +0.67
+did: against the pooled between-animal SD of 0.152, detection at 80% power needs
+**n ≥ 5–6 per group** rather than 5, and AP correction should be applied as
+standard rather than relied on for matching alone.
+
+## 14. Ageing signature
 
 `Gfap` (+0.24), `Cd68` (+0.25), `Trem2` (+0.30 log2) up consistently in both
 blocks; `Spp1`, `Cd44`, `Igfbp5` inconsistent, `Ly6a` down. A partial glial

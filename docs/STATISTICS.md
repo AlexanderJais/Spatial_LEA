@@ -48,17 +48,21 @@ than any pooled p-value, and immune to the n = 2 problem.
 These have a valid unit of replication that is *not* the animal, so they carry
 real p-values.
 
-**Rostro-caudal confound test.** Effect size versus AP mismatch across all 18
-possible section pairings. The unit is the section pair; the question is whether
-the apparent effect tracks anatomical mismatch. Pearson correlation.
+**Rostro-caudal correction.** Not the pairwise correlation — that version was
+audited and failed (AP gap is perfectly confounded with block, the 18 pairings
+share sections so the p-value is anticonservative ~40×, and 38% of the panel
+fires at p<0.05). Use instead the **within-animal AP slope**: fit
+`log2 CPM ~ AP + animal`, where the animal term absorbs age, so the slope is
+anatomical by construction. Correct each section to a common AP level and
+recompute the blocked effect, calibrating the shrinkage against the whole panel.
 
-- `Galr1` in DMH Gal/Galr1 neurons: **r = −0.69, p = 0.002** → the effect grows
-  as matching worsens. Artifact.
-- `Gal` in ARC Agrp/Npy neurons: **r = +0.12, p = 0.63** → indifferent to
-  matching. Survives.
+- `Galr1` in DMH Gal/Galr1 neurons: **93.6% of the effect removed, sign flips**;
+  only 5.4% of panel genes shrink as much → anatomical.
+- `Gal` in ARC Agrp/Npy neurons: **32.6% removed**, sign kept in both blocks,
+  shrinkage typical of the panel (rank 22.4%) → survives, at +0.45 log2.
 
-This is the single most defensible inferential result in the study, and it is
-also a methodological contribution: it quantifies a confound that spatial
+This is the most defensible inferential result in the study, and a
+methodological contribution: it quantifies and removes a confound that spatial
 hypothalamic studies generally do not control.
 
 **Panel-null calibration.** Applying identical filters (consistent direction in
@@ -133,10 +137,10 @@ So the honest negative statement is:
 
 And the honest positive statement:
 
-> "`Gal` in ARC Agrp/Npy neurons differs by 1.59× (log2 +0.67), consistent in
-> both blocks, positive in all 18 section pairings, independent of rostro-caudal
-> matching (r = +0.12, p = 0.63), and one of 9 of 297 panel genes passing all
-> reproducibility filters. Confirming it at 80% power requires n ≥ 5 per group."
+> "`Gal` in ARC Agrp/Npy neurons differs by 1.37× (log2 +0.45) after correction
+> for rostro-caudal position, consistent in direction in both blocks, and one of
+> 9 of 297 panel genes passing all reproducibility filters. Confirming it at 80%
+> power requires n ≥ 5–6 per group."
 
 ---
 
