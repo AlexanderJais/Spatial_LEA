@@ -252,7 +252,80 @@ reported separately, or F536 excluded and replaced. Any future cohort should
 collect sections spanning a wider AP range per animal so matching is possible
 across all animals, not just two.
 
-## 10. Ageing signature
+## 11. Extended parcellation — and how big the DMH really is
+
+The three-nucleus Gaussian model was replaced by a 14-domain parcellation
+derived from tissue structure, then mapped onto named nuclei by
+nucleus-diagnostic marker z-scores (`18_extended_nuclei.py`). Four proposed
+domain groupings were tested rather than assumed:
+
+| proposal | verdict | evidence |
+|---|---|---|
+| VMH = domains 7 + 4 | **confirmed** | both Slc17a6-dominant (z +2.13, +1.76); 7 is dorsomedial (\|ml\| 246, Rasgrf2 58%), 4 ventrolateral (\|ml\| 443, Calb1 41%) |
+| ZI = domains 10 + 0 | **0 yes, 10 no** | 0 is GABAergic (z +1.77, Cacna2d2 48%) as ZI must be; 10 is glutamatergic (Slc17a6 z +1.23, ZI z −0.10) → dorsal hypothalamic area |
+| ARC = domains 12 + 9 | **9 yes, 12 is ME/3V** | 9 scores ARC z +2.96 (Agrp, Pomc, Ghrh, Tac2); 12 is the 3V floor, 64% tanycyte. Legitimate as a combined "ARC+ME" unit if labelled so |
+| DMH = domains 13 + 8 | **13 yes, 8 mostly LHA** | 8 scores LHA z +2.11, sits at \|ml\| 742 (p90 1011), and is 64.5% Hcrt⁺ laterally vs 40.8% medially |
+
+Domain 8 is one niche by composition but two structures by anatomy, so it is
+split at \|ml\| = 500 µm: the medial fringe (Grp⁺ 18.6% vs 11.9% laterally) joins
+the DMH, the lateral portion becomes the LHA.
+
+### The DMH size question, answered
+
+| definition | cells/section | size |
+|---|---|---|
+| Gaussian ellipse (Grp-anchored) | 1 103 | 1084 × **380** µm |
+| domain 13 alone | 1 037 | 1026 × **469** µm |
+| domain 13 + medial fringe of 8 | 1 254 | 1000 × **477** µm |
+| published mouse DMH | — | ~800–1200 × **500–700** µm |
+
+Adding the medial fringe of domain 8 grows the DMH by 21% in cells but barely in
+height (469 → 477 µm), because domain 8 occupies the same dorsoventral band. So
+the DMH really does come out at ~480 µm in these sections — at the low end of,
+but not far outside, the published range for a single coronal plane. The
+mediolateral width (1000 µm bilateral) matches published values well.
+
+### Full parcellation
+
+| nucleus | cells | per section | width | height | between-animal CV |
+|---|---|---|---|---|---|
+| ARC | 6 639 | 553 | 688 µm | 310 µm | **10.2%** |
+| ME/3V | 8 050 | 671 | 214 µm | 1278 µm | **14.8%** |
+| VMH | 21 686 | 1 807 | 1194 µm | 521 µm | **11.2%** |
+| DMH | 15 053 | 1 254 | 1000 µm | 477 µm | 35.4% |
+| LHA | 16 080 | 1 340 | 2204 µm | 714 µm | 30.3% |
+| ZI | 17 703 | 1 475 | 2227 µm | 548 µm | 49.2% |
+| DHA/PH | 17 340 | 1 445 | 2876 µm | 990 µm | 33.5% |
+
+**The CV column decides which nuclei can be compared across animals.** ARC, ME
+and VMH are sampled evenly (10–15%); DMH, LHA, ZI and DHA vary 30–49% because
+their cross-sectional area changes steeply with rostro-caudal level. M399 in
+particular contributes 1 807 DMH cells against 4 100–4 800 for the other three,
+and 7 162 ZI cells against 2 044 for F536. **Age comparisons in the AP-limited
+nuclei are confounded with section level before any gene is examined.**
+
+### Galanin system in the new territory
+
+Extending to LHA, ZI and DHA/PH added no robust effect. Nine candidates cleared
+the blocked filters; applying the AP test and the sampling-balance criterion
+leaves **one**:
+
+| nucleus | cell type | gene | LFC B1 | LFC B2 | best-matched | same-sign pairings | r vs AP gap |
+|---|---|---|---|---|---|---|---|
+| ME/3V | ARC Agrp/Npy | `Gal` | +1.18 | +1.23 | **+1.46** | 18/18 | −0.41 (p = 0.09) |
+
+This is the same finding as §6, localised more precisely: the `Gal` increase in
+AgRP neurons is **strongest in the ones bordering the median eminence** (~2.3×
+there versus ~1.7× in the arcuate as a whole), and it is *larger* at the
+best-matched pairing than on average — the opposite of an artifact.
+
+Two candidates were caught by the AP test and are anatomy, not age: `Galr3` in
+DHA/PH glutamatergic neurons (r = +0.56, p = 0.016) and in DHA/PH overall
+(r = +0.64, p = 0.004). Several others pass the AP correlation but collapse at
+the best-matched pairing (DHA/PH `Gal`: +2.02/+2.79 overall, +0.37 matched) and
+sit in nuclei with 30–49% sampling CV, so they are not pursued.
+
+## 12. Ageing signature
 
 `Gfap` (+0.24), `Cd68` (+0.25), `Trem2` (+0.30 log2) up consistently in both
 blocks; `Spp1`, `Cd44`, `Igfbp5` inconsistent, `Ly6a` down. A partial glial
