@@ -165,7 +165,94 @@ The other 8 genes passing in ARC Agrp/Npy are `Cldn5`, `Pglyrp1`, `Igf1`,
 mild independent support that this population is genuinely changing rather than
 the filter being noise.
 
-## 7. Ageing signature
+## 8. How big is the DMH, really?
+
+Short answer: **the delineation was too small, and even the improved one is at
+the low end.**
+
+The Gaussian model fits each nucleus to marker-defined anchors. ARC had 1 856
+anchor cells across 4 cell types and VMH 5 525 across 3 — but **DMH had 343
+cells from a single type**, `DMH Grp/Ppp1r17`. `Grp` marks a restricted DMH
+subpopulation, so the ellipse is the extent of the Grp⁺ core, not the nucleus.
+
+`13_spatial_domains.py` re-derives the domains from tissue structure instead:
+every cell is described by the cell-type composition of its 30 nearest spatial
+neighbours, and those descriptions are clustered into 14 niches over the whole
+hypothalamic window (164 943 cells). Domain 13 is the DMH — `GABA Gal/Galr1`
+23%, `DMH Grp/Ppp1r17` 9%, sitting dorsal to the VMH domains.
+
+| definition | cells/section | \|ml\| p5–95 | dv p5–95 | size |
+|---|---|---|---|---|
+| Gaussian ellipse (Grp-anchored) | 1 103 | 136–542 | 985–1364 | 1084 × **380** µm |
+| Domain 13 (tissue-derived) | 1 037 | 71–513 | 868–1337 | 1026 × **469** µm |
+| published mouse DMH | — | ~400–600/side | — | ~800–1200 × **500–700** µm |
+
+The tissue-derived domain is 23% taller and captures more of the relevant
+populations (`GABA Gal/Galr1` 68.6% vs 51.1%; `DMH Grp` 85.7% vs 78.5%), but
+**both fall short dorsoventrally**, and the two definitions agree only at
+**Jaccard 0.44** — 37% of the domain lies outside the ellipse and 41% of the
+ellipse outside the domain. That disagreement brackets the real uncertainty.
+
+The domain is also far less stable section to section (CV 31% vs 10%, ranging
+259–1 322 cells), which is partly genuine: the DMH's size really does change
+with rostro-caudal level. That is a worse denominator but a truer boundary.
+
+**Neither method can settle this, because both infer the DMH from its contents.**
+With the DAPI images now available, registration to the Allen CCF would give a
+boundary defined by anatomy rather than by cell type, and is the way to close
+this properly.
+
+## 9. AP matching — and what it proves
+
+`14_ap_matching.py` scores each section's rostro-caudal level from **morphometry**
+— third-ventricle length, tissue half-width at four dorsoventral levels, midline
+extent, VMH position and width, window cell count. Morphometry rather than
+cell composition on purpose: matching on composition would risk regressing out
+the very age differences being tested.
+
+The score orders sections by cut order in **4 of 4 animals**, and unlike the
+composition axis, the aged and adult ranges now **overlap**.
+
+**But a four-animal matched set is not available.** F536's sections score +2.2
+to +4.2 while the other three animals span −2.1 to −0.1 — that block was cut at
+a different level. The tightest one-per-animal set still spans 3.50 of the full
+6.23. Within blocks, however:
+
+| block | best pair | AP gap |
+|---|---|---|
+| B2 (G_073 aged vs M399 adult) | **G073_1 vs M399_3** | **0.04** |
+| B1 (F536 aged vs M493 adult) | F536_2 vs M493_3 | 2.36 |
+
+For scale, adjacent sections within one animal differ by ~0.51. So **B2 pairs
+almost exactly; B1 cannot be matched at all.**
+
+### The discrimination
+
+Computing each candidate across *all 18 possible section pairings* and
+correlating the effect size with the AP gap separates artifact from signal:
+
+| candidate | effect vs AP mismatch | best-matched pair | poorly-matched mean | verdict |
+|---|---|---|---|---|
+| `Galr1`, DMH GABA Gal/Galr1 | **r = −0.69 (p = 0.002)** | −0.17 | −0.62 | **artifact** — the effect grows with mismatch |
+| `Gal`, ARC Agrp/Npy | r = +0.12 (p = 0.63) | **+0.74** | +0.68 | **survives** — indifferent to matching |
+| `Gal`, DMH GABA Cacna2d2 | r = −0.10 (p = 0.70) | +0.66 | +0.36 | survives, noisier |
+
+This is the cleanest result in the study. The DMH Galr1 "effect" is a direct
+function of how badly the compared sections are matched — at near-perfect
+matching it collapses from −0.62 to −0.17, and its detection-rate version
+reverses sign. **`Gal` in ARC Agrp/Npy neurons does the opposite**: it is
+unchanged by matching, positive in every one of the 18 pairings, and largest at
+the best-matched pair.
+
+### Practical answer
+
+Yes, a matched core set exists — **but only within block B2**. The usable
+comparison is `G073_1` vs `M399_3`, matched to 0.04 AP units. Block B1 should be
+reported separately, or F536 excluded and replaced. Any future cohort should
+collect sections spanning a wider AP range per animal so matching is possible
+across all animals, not just two.
+
+## 10. Ageing signature
 
 `Gfap` (+0.24), `Cd68` (+0.25), `Trem2` (+0.30 log2) up consistently in both
 blocks; `Spp1`, `Cd44`, `Igfbp5` inconsistent, `Ly6a` down. A partial glial
