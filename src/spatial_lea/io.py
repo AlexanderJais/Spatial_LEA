@@ -1,0 +1,120 @@
+"""Loading Xenium sections into AnnData, with ROI membership attached.
+
+A Xenium ``cell_feature_matrix.h5`` holds the panel genes *and* the control
+channels (negative-control probes, negative-control codewords, genomic controls,
+unassigned/deprecated codewords) in one matrix.  The controls are what make it
+possible to say whether a low count for a gene like ``Galr1`` is signal or
+background, so they are kept in ``adata.uns`` rather than discarded on load.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import anndata as ad
+import numpy as np
+import pandas as pd
+import scanpy as sc
+
+from spatial_lea.roi import Roi, cells_in_roi, load_rois, roi_display_coords
+
+REPO = Path(__file__).resolve().parents[2]
+RAW = REPO / "data" / "raw"
+ROI_FILE = REPO / "config" / "roi_coordinates_male_2vs2.json"
+
+GENE_TYPE = "Gene Expression"
+CONTROL_TYPES = (
+    "Negative Control Probe",
+    "Negative Control Codeword",
+    "Genomic Control",
+    "Unassigned Codeword",
+    "Deprecated Codeword",
+)
+
+# section -> animal, and the study design.  Kept here so a loaded object always
+# carries its group labels and can never be analysed with them detached.
+SECTION_ANIMAL = {"F536_1": "F536", "G073_2": "G_073", "M399_3": "M399", "M493_2": "M493"}
+ANIMAL_META = {
+    "F536": {"age_group": "aged", "age_weeks": 70, "batch": "B1", "sex": "male"},
+    "M493": {"age_group": "adult", "age_weeks": 29, "batch": "B1", "sex": "male"},
+    "G_073": {"age_group": "aged", "age_weeks": 65, "batch": "B2", "sex": "male"},
+    "M399": {"age_group": "adult", "age_weeks": 30, "batch": "B2", "sex": "male"},
+}
+
+
+def load_section(section: str, raw: Path = RAW, roi_file: Path = ROI_FILE) -> ad.AnnData:
+    """Load one section: counts, cell metadata, design labels and ROI mask."""
+    folder = raw / section
+    adata = sc.read_10x_h5(folder / "cell_feature_matrix.h5", gex_only=False)
+    adata.var_names_make_unique()
+
+    cells = pd.read_parquet(folder / "cells.parquet").set_index("cell_id")
+    missing = adata.obs_names.difference(cells.index)
+    if len(missing):
+        raise ValueError(f"{section}: {len(missing)} cells in matrix absent from cells.parquet")
+    adata.obs = cells.reindex(adata.obs_names).copy()
+
+    adata.obsm["spatial"] = adata.obs[["x_centroid", "y_centroid"]].to_numpy(dtype=float)
+
+    animal = SECTION_ANIMAL[section]
+    adata.obs["section"] = pd.Categorical([section] * adata.n_obs)
+    adata.obs["animal"] = pd.Categorical([animal] * adata.n_obs)
+    for key, value in ANIMAL_META[animal].items():
+        adata.obs[key] = pd.Categorical([value] * adata.n_obs)
+
+    rois = load_rois(roi_file)
+    roi = rois[section]
+    adata.obs["in_roi"] = cells_in_roi(adata.obs, roi)
+    adata.obs[["roi_x", "roi_y"]] = roi_display_coords(adata.obs, roi)
+    adata.uns["roi"] = {
+        "name": roi.roi_name,
+        "rotation_deg": roi.rotation_deg,
+        "n_cells_expected": roi.n_cells_expected,
+    }
+
+    _split_controls(adata)
+    return adata
+
+
+def _split_controls(adata: ad.AnnData) -> None:
+    """Move control channels out of ``X`` into ``obs``/``uns``.
+
+    Per-cell control totals become obs columns (used for background calibration);
+    the per-probe control matrix is kept in ``uns`` so the null distribution of a
+    single probe can be compared against a single gene.
+    """
+    feature_type = adata.var["feature_types"].astype(str)
+    is_gene = feature_type == GENE_TYPE
+    is_control = feature_type.isin(CONTROL_TYPES)
+
+    control = adata[:, is_control]
+    counts = np.asarray(control.X.sum(axis=1)).ravel()
+    adata.obs["control_counts"] = counts
+    for ctype in CONTROL_TYPES:
+        sel = feature_type == ctype
+        if sel.any():
+            key = ctype.lower().replace(" ", "_") + "_counts"
+            adata.obs[key] = np.asarray(adata[:, sel].X.sum(axis=1)).ravel()
+
+    # Kept in obsm, not uns, so it is subset along with the cells.  Storing it in
+    # uns silently survives a cell filter and then misaligns with X.
+    adata.obsm["control_counts_matrix"] = control.X.copy()
+    adata.uns["control_names"] = control.var_names.to_numpy()
+    adata.uns["control_types"] = feature_type[is_control].to_numpy()
+
+    adata._inplace_subset_var(is_gene.to_numpy())
+    adata.obs["gene_counts"] = np.asarray(adata.X.sum(axis=1)).ravel()
+    adata.obs["n_genes"] = np.asarray((adata.X > 0).sum(axis=1)).ravel()
+
+
+def load_all(sections=tuple(SECTION_ANIMAL), raw: Path = RAW, roi_only: bool = False) -> ad.AnnData:
+    """Concatenate sections. ``roi_only`` restricts to cells inside the MBH ROI."""
+    parts = []
+    for section in sections:
+        adata = load_section(section, raw=raw)
+        if roi_only:
+            adata = adata[adata.obs["in_roi"]].copy()
+        parts.append(adata)
+    merged = ad.concat(parts, label="section_key", keys=list(sections), index_unique="-", merge="same")
+    merged.uns["sections"] = list(sections)
+    return merged

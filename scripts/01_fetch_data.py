@@ -4,9 +4,14 @@
 The folder is world-readable, so no credentials are needed; file listings are
 scraped from the Drive web view because the Drive API would require a key.
 
-    python scripts/01_fetch_data.py                # everything
+    python scripts/01_fetch_data.py                # the core set (~150 MB)
+    python scripts/01_fetch_data.py --all          # incl. transcripts (~2.2 GB)
     python scripts/01_fetch_data.py --sections M493_2 F536_1
     python scripts/01_fetch_data.py --list-only    # audit what is on Drive
+
+By default only the files the pipeline actually needs are fetched;
+``transcripts.parquet`` (~0.5 GB per section) is pulled only for re-segmentation
+and subcellular QC, so it is opt-in via ``--all``.
 
 Files already present with a non-zero size are skipped, so the script is safe to
 re-run after a partial download.
@@ -24,8 +29,28 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 RAW = REPO / "data" / "raw"
-ROOT_FOLDER = "18VEea5Ath_wbyXeIz_PYZcgwfx6lYJZt"
+# "Xenium Lea" -- full output bundles for the four ROI sections.
+ROOT_FOLDER = "11stRgPPOnkQSuFG6LQtrgdD9YSriA5Tz"
 FOLDER_MIME = "application/vnd.google-apps.folder"
+
+# Everything the pipeline needs.  transcripts.parquet is ~0.5 GB per section and
+# is only used for re-segmentation, so it is excluded unless --all is given.
+CORE_FILES = {
+    "cell_feature_matrix.h5",
+    "cells.parquet",
+    "nucleus_boundaries.parquet",
+    "cell_boundaries.parquet",
+    "experiment.xenium",
+    "gene_panel.json",
+    "metrics_summary.csv",
+}
+# Redundant with the files above, or too bulky to mirror by default.
+SKIP_ALWAYS = {
+    "cell_feature_matrix.zarr.zip",
+    "analysis.zarr.zip",
+    "analysis_summary.html",
+    "cell_boundaries.csv.gz",
+}
 
 _ITEM_RE = re.compile(r'\[\[null,"([0-9A-Za-z_-]{20,})"\],null,null,null,"([^"]+)"')
 _NAME_RE = re.compile(r'\[\[\["([^"]{1,120})",null,1\]\]\]')
@@ -101,6 +126,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sections", nargs="*", help="section ids, default: all")
     parser.add_argument("--list-only", action="store_true", help="print the tree, download nothing")
+    parser.add_argument("--all", action="store_true", help="also fetch transcripts.parquet (~0.5 GB/section)")
     parser.add_argument("--max-depth", type=int, default=3)
     args = parser.parse_args()
 
@@ -114,7 +140,17 @@ def main() -> int:
             print(f"{kind} {entry['path']:60s} {entry['size'] or '-':>10s}")
         return 0
 
-    files = [e for e in tree if e["mime"] != FOLDER_MIME]
+    wanted = set(CORE_FILES)
+    if args.all:
+        wanted.add("transcripts.parquet")
+
+    files = [
+        e
+        for e in tree
+        if e["mime"] != FOLDER_MIME
+        and e["name"] not in SKIP_ALWAYS
+        and (e["name"] in wanted or "/" not in e["path"])
+    ]
     failures = []
     for entry in sorted(files, key=lambda e: e["path"]):
         section = entry["path"].split("/")[-2] if "/" in entry["path"] else "_root"
