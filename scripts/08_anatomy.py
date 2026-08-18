@@ -36,6 +36,7 @@ from spatial_lea.anatomy import (  # noqa: E402
 )
 from spatial_lea.io import (  # noqa: E402
     ANIMAL_META, SECTION_ANIMAL, SUSPECT_SECTIONS, counts_matrix, load_section,
+    shared_genes,
 )
 
 OUT = REPO / "results" / "anatomy"
@@ -44,8 +45,14 @@ MIN_COUNTS, MIN_GENES = 10, 5
 ANCHOR_GENES = ["Gpr50", "Spag16", "Agrp", "Pomc", "Adcyap1", "Grp", "Ppp1r17"]
 
 
-def load_qc(section: str):
+def load_qc(section: str, keep_genes=None):
     adata = load_section(section)
+    if keep_genes is not None:
+        # The two cohorts ran different panels (315 of 325 targets in common).
+        # A gene missing from one panel would otherwise read as a gene absent
+        # from those animals -- a technical zero, not a biological one -- so
+        # every section is cut to the shared set before anything is merged.
+        adata = adata[:, [g for g in keep_genes if g in adata.var_names]].copy()
     keep = (
         (adata.obs["gene_counts"] >= MIN_COUNTS)
         & (adata.obs["n_genes"] >= MIN_GENES)
@@ -64,13 +71,15 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     PROC.mkdir(parents=True, exist_ok=True)
     sections = list(SECTION_ANIMAL)
+    keep_genes = shared_genes(sections)
+    print(f"{len(keep_genes)} genes shared by every panel in the {len(sections)} sections\n")
 
     parts, frames, coord_parts, count_parts = [], [], [], []
     print("=== Anatomical frame per section ===")
     print(f"{'section':9s} {'animal':7s} {'group':6s} {'cells':>7s} {'lining':>7s} "
           f"{'elong':>6s} {'ventral direction':>20s}")
     for section in sections:
-        adata, counts = load_qc(section)
+        adata, counts = load_qc(section, keep_genes)
         frame = find_frame(adata.obsm["spatial"], counts, section)
         coords = to_frame(adata.obsm["spatial"], frame)
         coords.index = adata.obs_names
@@ -88,7 +97,7 @@ def main() -> int:
               f"{adata.n_obs:7d} {frame.n_lining:7d} {frame.quality:6.2f} "
               f"({frame.ventral_dir[0]:+.2f},{frame.ventral_dir[1]:+.2f}){flag}")
 
-    merged_pre = ad.concat(parts, label="section", keys=sections, index_unique="-", merge="same")
+    merged_pre = ad.concat(parts, label="section", keys=sections, index_unique="-", merge="same", join="inner")
     coords_pre = pd.DataFrame(
         {"ml": merged_pre.obs["ml"].to_numpy(), "dv": merged_pre.obs["dv"].to_numpy()},
         index=merged_pre.obs_names,

@@ -9,6 +9,7 @@ background, so they are split out into ``obs``/``obsm`` rather than discarded.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import anndata as ad
@@ -34,22 +35,81 @@ CONTROL_TYPES = (
 # section -> animal, and the study design.  Kept here so a loaded object always
 # carries its group labels and can never be analysed with them detached.
 SECTION_ANIMAL = {
+    # Cohort A -- male, panel 7ZBFXR, nucleus-expansion segmentation, 3 sections each.
     "F536_1": "F536", "F536_2": "F536", "F536_3": "F536",
     "G073_1": "G_073", "G073_2": "G_073", "G073_3": "G_073",
     "M399_1": "M399", "M399_2": "M399", "M399_3": "M399",
     "M493_1": "M493", "M493_2": "M493", "M493_3": "M493",
+    # Cohort B -- female, panel NCY734, stain-kit segmentation, 1 section each.
+    "K238_2": "K238", "P953_1": "P953", "F739_2": "F739", "Q378_2": "Q378",
 }
 # The four sections with a hand-drawn ROI; kept only to reproduce the original
 # analysis and to validate the anatomical frame against it.
 ROI_SECTIONS = ("F536_1", "G073_2", "M399_3", "M493_2")
 # Flagged by the lab as physically distorted; analysed but reported separately.
 SUSPECT_SECTIONS = ("M399_2",)
+# The section the lab selected as best for each animal.
+SELECTED_SECTIONS = ("F536_1", "G073_2", "M399_3", "M493_2",
+                     "K238_2", "P953_1", "F739_2", "Q378_2")
+
+# Eight animals, four aged and four adult, in four blocks.  Sex is completely
+# confounded with panel and with segmentation chemistry -- all four males ran on
+# 7ZBFXR with nucleus expansion, all four females on NCY734 with the stain kit --
+# so no male/female difference can be interpreted.  **Age is not confounded**:
+# every block is one aged and one adult animal on the same slide run, panel and
+# chemistry, so an age contrast formed within blocks never crosses those
+# boundaries.  Sex is a blocking factor here, not a variable.
 ANIMAL_META = {
-    "F536": {"age_group": "aged", "age_weeks": 70, "batch": "B1", "sex": "male"},
-    "M493": {"age_group": "adult", "age_weeks": 29, "batch": "B1", "sex": "male"},
-    "G_073": {"age_group": "aged", "age_weeks": 65, "batch": "B2", "sex": "male"},
-    "M399": {"age_group": "adult", "age_weeks": 30, "batch": "B2", "sex": "male"},
+    "F536": {"age_group": "aged", "age_weeks": 70, "batch": "B1", "sex": "male",
+             "panel": "7ZBFXR", "detection": "nucleus_expansion"},
+    "M493": {"age_group": "adult", "age_weeks": 29, "batch": "B1", "sex": "male",
+             "panel": "7ZBFXR", "detection": "nucleus_expansion"},
+    "G_073": {"age_group": "aged", "age_weeks": 65, "batch": "B2", "sex": "male",
+              "panel": "7ZBFXR", "detection": "nucleus_expansion"},
+    "M399": {"age_group": "adult", "age_weeks": 30, "batch": "B2", "sex": "male",
+             "panel": "7ZBFXR", "detection": "nucleus_expansion"},
+    "K238": {"age_group": "aged", "age_weeks": 73, "batch": "B3", "sex": "female",
+             "panel": "NCY734", "detection": "stain_kit"},
+    "P953": {"age_group": "adult", "age_weeks": 25, "batch": "B3", "sex": "female",
+             "panel": "NCY734", "detection": "stain_kit"},
+    "F739": {"age_group": "aged", "age_weeks": 68, "batch": "B4", "sex": "female",
+             "panel": "NCY734", "detection": "stain_kit"},
+    "Q378": {"age_group": "adult", "age_weeks": 24, "batch": "B4", "sex": "female",
+             "panel": "NCY734", "detection": "stain_kit"},
 }
+# Aged/adult pair per block; the unit every age contrast is formed on.
+BLOCKS = {"B1": ("F536", "M493"), "B2": ("G_073", "M399"),
+          "B3": ("K238", "P953"), "B4": ("F739", "Q378")}
+AGED = tuple(a for a, m in ANIMAL_META.items() if m["age_group"] == "aged")
+ADULT = tuple(a for a, m in ANIMAL_META.items() if m["age_group"] == "adult")
+
+
+def shared_genes(sections=tuple(SECTION_ANIMAL), raw: Path = RAW) -> list[str]:
+    """Genes present on every panel in `sections`, in a stable order.
+
+    The two panels overlap in 315 of 325 targets.  Mixing cohorts without
+    intersecting them would leave a gene missing from one panel looking like a
+    gene absent from those animals, which is a technical zero, not a biological
+    one.
+    """
+    common, order = None, []
+    for section in sections:
+        genes = _panel_genes(raw / section / "gene_panel.json")
+        if common is None:
+            common, order = set(genes), list(genes)
+        else:
+            common &= set(genes)
+    return [g for g in order if g in common]
+
+
+def _panel_genes(path: Path) -> list[str]:
+    payload = json.loads(path.read_text()).get("payload", {})
+    out = []
+    for target in payload.get("targets", []):
+        name = target.get("type", {}).get("data", {}).get("name")
+        if name:
+            out.append(name)
+    return out
 
 
 def _read_matrix(folder: Path) -> ad.AnnData:

@@ -112,11 +112,13 @@ def walk(folder_id: str, prefix: str = "", depth: int = 0, max_depth: int = 3) -
 # and each may nest files inside cell_feature_matrix/ or morphology_focus/.
 # Both are flattened to data/raw/<section>/ so downstream code sees one layout.
 SUBDIRS = {"cell_feature_matrix", "morphology_focus"}
-CONTAINER_DIRS = {"additional slides"}
+# Grouping folders that are not sections: matched case-insensitively,
+# since the Drive uses "Male"/"Female" but "additional slides".
+CONTAINER_DIRS = {"additional slides", "male", "female"}
 
 
 def _section_of(path: str) -> str:
-    parts = [p for p in path.split("/") if p and p not in CONTAINER_DIRS]
+    parts = [p for p in path.split("/") if p and p.lower() not in CONTAINER_DIRS]
     parts = [p for p in parts if p not in SUBDIRS]
     return parts[-2] if len(parts) >= 2 else "_root"
 

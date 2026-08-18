@@ -80,6 +80,15 @@ def cluster_cells(adata):
 
 
 def transfer_labels(adata) -> pd.Series:
+    """Name each cluster from the annotated reference cells inside it.
+
+    The reference is the hand-drawn ROI annotation, which exists only for the
+    male sections.  Clusters that contain no reference cell -- which the female
+    cohort can produce, since it ran a different panel and segmentation
+    chemistry -- are named instead by correlating their mean profile against the
+    reference cell-type profiles.  The two routes are counted separately so it
+    stays visible how many labels rest on which.
+    """
     ref = sc.read_h5ad(PROC / "mbh_roi_annotated.h5ad")
     key = ref.obs["section"].astype(str) + "|" + ref.obs_names.str.split("-").str[0]
     ref_map = pd.Series(ref.obs["cell_type"].astype(str).to_numpy(), index=key)
@@ -87,14 +96,57 @@ def transfer_labels(adata) -> pd.Series:
     own = adata.obs["section"].astype(str) + "|" + adata.obs_names.str.split("-").str[0]
     prior = pd.Series(ref_map.reindex(own).to_numpy(), index=adata.obs_names)
 
-    mapping = {}
-    for cluster, sub in prior.groupby(adata.obs["leiden"].astype(str), observed=True):
+    clusters = adata.obs["leiden"].astype(str)
+    mapping, by_prior, by_profile = {}, 0, 0
+    for cluster, sub in prior.groupby(clusters, observed=True):
         known = sub.dropna()
-        mapping[cluster] = known.value_counts().index[0] if len(known) >= 15 else f"unlabelled_{cluster}"
-    labelled = adata.obs["leiden"].astype(str).map(mapping)
-    print(f"  {prior.notna().sum():,} cells carried a prior label; "
-          f"{sum(v.startswith('unlabelled') for v in mapping.values())} clusters left unlabelled")
+        if len(known) >= 15:
+            mapping[cluster] = known.value_counts().index[0]
+            by_prior += 1
+        else:
+            mapping[cluster] = None
+
+    unnamed = [c for c, v in mapping.items() if v is None]
+    if unnamed:
+        profiles = _reference_profiles(ref, adata.var_names)
+        expr = _cluster_profiles(adata, clusters, unnamed, list(profiles.columns))
+        for cluster, vec in expr.items():
+            corr = profiles.apply(lambda p: np.corrcoef(p, vec)[0, 1], axis=1)
+            mapping[cluster] = (corr.idxmax() if corr.max() > 0.3
+                                else f"unlabelled_{cluster}")
+            by_profile += 1
+
+    labelled = clusters.map(mapping)
+    print(f"  {prior.notna().sum():,} cells carried a reference label; "
+          f"{by_prior} clusters named from reference cells, "
+          f"{by_profile} from profile correlation")
     return pd.Series(labelled.to_numpy(), index=adata.obs_names)
+
+
+def _reference_profiles(ref, var_names) -> pd.DataFrame:
+    """Mean centred log-CPM profile per annotated cell type, on the shared genes."""
+    genes = [g for g in var_names if g in ref.var_names]
+    counts = ref[:, genes].layers["counts"]
+    counts = np.asarray(counts.todense() if hasattr(counts, "todense") else counts)
+    cpm = np.log1p(counts / np.maximum(counts.sum(axis=1, keepdims=True), 1) * 1e4)
+    df = pd.DataFrame(cpm, columns=genes)
+    df["cell_type"] = ref.obs["cell_type"].astype(str).to_numpy()
+    df = df[~df["cell_type"].str.startswith("unlabelled")]
+    prof = df.groupby("cell_type").mean()
+    return prof.sub(prof.mean(axis=1), axis=0)
+
+
+def _cluster_profiles(adata, clusters, wanted, genes) -> dict:
+    """Mean centred log-CPM per cluster, in the same gene order as the profiles."""
+    counts = adata[:, genes].layers["counts"]
+    counts = np.asarray(counts.todense() if hasattr(counts, "todense") else counts)
+    out = {}
+    for cluster in wanted:
+        sel = (clusters == cluster).to_numpy()
+        block = counts[sel]
+        v = np.log1p(block.sum(axis=0) / max(block.sum(), 1) * 1e4)
+        out[cluster] = v - v.mean()
+    return out
 
 
 def niche_composition(adata, labels: pd.Series) -> pd.DataFrame:
