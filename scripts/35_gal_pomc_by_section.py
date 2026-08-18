@@ -1,14 +1,26 @@
 #!/usr/bin/env python3
-"""Gal in ARC Pomc neurons, one label per section, all four animals.
+"""Gal in ARC Pomc neurons, per section and per animal, all four mice.
 
 Same layout as figure 5a, which showed Gal in ARC Agrp/Npy, so the two read
-against each other directly.  The marker is the section number rather than a
-dot, so a point that sits apart from its animal's other two can be identified
-and gone back to.
+against each other directly.  The marker is the section number rather than a dot,
+so any section can be identified and gone back to.
 
-Section numbers are slide identifiers, not rostro-caudal order -- the
-morphometric AP score for each is printed to the console and written to the
-source-data file, since that is what actually orders them.
+**Inference is at the animal level**, which is the unit of replication -- three
+sections from one mouse are pseudoreplicates and cannot vote independently.  That
+matters here: judging on complete section-level separation instead would let a
+single section out of twelve overturn a result that all four animals agree on,
+and between-section SD in this dataset (0.265 log2) is larger than
+between-animal SD (0.152), so one deviant section is expected rather than
+surprising.
+
+With 2 animals per group there are only 6 ways to assign the labels, so the
+exact permutation p cannot go below 1/6 = 0.167.  A result at that value is as
+extreme as the design can produce; it is a statement about the design's
+resolution, not a weak result.
+
+Section numbers are slide identifiers, not rostro-caudal order.  The morphometric
+AP score is reported alongside so an AP explanation can be checked rather than
+assumed.
 
     python scripts/35_gal_pomc_by_section.py
     python scripts/35_gal_pomc_by_section.py --cell-type "ARC Agrp/Npy"
@@ -87,8 +99,25 @@ def main() -> int:
     tag = args.cell_type.lower().replace(" ", "_").replace("/", "_")
     per.to_csv(SRC / f"gal_{tag}_per_section.csv", index=False)
 
-    fig, axes = plt.subplots(1, 2, figsize=(6.0, 3.3))
-    fig.subplots_adjust(top=.70, wspace=.50)
+    from itertools import combinations
+    per_animal = per.groupby("animal").agg(group=("group", "first"),
+                                           gal_cpm=("gal_cpm", "mean"),
+                                           detect_pct=("detect_pct", "mean"))
+    per_animal = per_animal.reindex(ANIMALS)
+    aged_a = per_animal[per_animal.group == "aged"]["gal_cpm"]
+    adult_a = per_animal[per_animal.group == "adult"]["gal_cpm"]
+    lfc = float(np.log2(aged_a.mean() / adult_a.mean()))
+    separates = bool(aged_a.min() > adult_a.max())
+
+    # Exact permutation over animals: every way of calling 2 of the 4 "aged".
+    vals = per_animal["gal_cpm"].to_numpy()
+    obs = aged_a.mean() - adult_a.mean()
+    stats = [vals[list(c)].mean() - vals[[i for i in range(4) if i not in c]].mean()
+             for c in combinations(range(4), 2)]
+    p_exact = float(np.mean([s >= obs for s in stats]))
+
+    fig, axes = plt.subplots(1, 3, figsize=(7.6, 3.5))
+    fig.subplots_adjust(top=.63, wspace=.58)
     # Sections are nudged apart on x so three labels for one animal never collide;
     # the offset carries no meaning beyond keeping them legible.
     OFFSET = {1: -.20, 2: .0, 3: .20}
@@ -100,14 +129,14 @@ def main() -> int:
             if not len(sub):
                 continue
             colour = GRP_COLOUR[ANIMAL_META[animal]["age_group"]]
-            ax.plot([i - .30, i + .30], [sub[col].mean()] * 2, color=colour, lw=2,
+            ax.plot([i - .30, i + .30], [sub[col].mean()] * 2, color=colour, lw=2.4,
                     zorder=2, solid_capstyle="butt")
             for _, r in sub.iterrows():
                 ax.text(i + OFFSET[r.section_no], r[col], str(r.section_no),
                         color=colour, fontsize=8.5, fontweight="bold",
                         ha="center", va="center", zorder=3)
-        # Text artists do not drive autoscaling, so the limits are set from the
-        # data or the outlying sections fall outside the axes.
+        # Text artists do not drive autoscaling, so limits come from the data or
+        # the outlying sections fall outside the axes.
         lo, hi = per[col].min(), per[col].max()
         pad = (hi - lo) * .14
         ax.set_ylim(lo - pad, hi + pad)
@@ -117,22 +146,45 @@ def main() -> int:
                            fontsize=6.5)
         ax.set_ylabel(ylab)
 
-    axes[0].set_title("Expression", loc="left", fontsize=8)
-    axes[1].set_title("Detection", loc="left", fontsize=8)
+    axes[0].set_title("Expression, per section", loc="left", fontsize=8)
+    axes[1].set_title("Detection, per section", loc="left", fontsize=8)
 
-    aged = per[per.group == "aged"]["gal_cpm"]
-    adult = per[per.group == "adult"]["gal_cpm"]
-    lfc = np.log2(aged.mean() / adult.mean())
-    overlap = aged.min() <= adult.max()
+    # (c) the animal level -- the unit that actually replicates
+    ax = axes[2]
+    for i, animal in enumerate(ANIMALS):
+        grp = ANIMAL_META[animal]["age_group"]
+        ax.scatter([0 if grp == "aged" else 1], [per_animal.loc[animal, "gal_cpm"]],
+                   s=52, color=GRP_COLOUR[grp], zorder=3)
+        ax.annotate(animal, (0 if grp == "aged" else 1,
+                             per_animal.loc[animal, "gal_cpm"]),
+                    xytext=(7, 0), textcoords="offset points", fontsize=6.5,
+                    va="center", color=GRP_COLOUR[grp])
+    for j, (grp, v) in enumerate((("aged", aged_a), ("adult", adult_a))):
+        ax.plot([j - .22, j + .22], [v.mean()] * 2, color=GRP_COLOUR[grp], lw=2.4,
+                solid_capstyle="butt")
+    if separates:
+        mid = (aged_a.min() + adult_a.max()) / 2
+        ax.axhline(mid, color="#9AA8A8", lw=.8, ls=":")
+        ax.annotate("no overlap", (1.34, mid), fontsize=6, color="#7A8A8A",
+                    va="bottom", ha="right")
+    ax.set_xlim(-.5, 1.5); ax.set_xticks([0, 1]); ax.set_xticklabels(["aged", "adult"])
+    ax.set_ylabel(f"{args.gene} (CPM), animal mean")
+    ax.set_title(f"Animal level, n=2 vs 2\nexact p = {p_exact:.3f}", loc="left", fontsize=8)
+
     fig.text(.02, .99, f"{args.gene} in {args.cell_type}", fontsize=11,
              fontweight="bold", va="top")
-    fig.text(.02, .90, f"{len(per)} sections, 4 animals. The number is the section; "
-             "the bar is the animal mean.", fontsize=7, color="#4A5656", va="top")
-    fig.text(.02, .82, f"aged {aged.mean():,.0f} vs adult {adult.mean():,.0f} CPM "
-             f"({lfc:+.2f} log2, {2**lfc:.2f}×). Section ranges "
-             f"{aged.min():,.0f}–{aged.max():,.0f} and {adult.min():,.0f}–{adult.max():,.0f} "
-             + ("overlap." if overlap else "do not overlap."),
+    fig.text(.02, .91, f"All four animals order by age: "
+             + " > ".join(f"{a} {per_animal.loc[a, 'gal_cpm']:,.0f}"
+                          for a in per_animal.sort_values('gal_cpm', ascending=False).index)
+             + f"  ({lfc:+.2f} log2, {2**lfc:.2f}×)", fontsize=7, color="#4A5656", va="top")
+    fig.text(.02, .84, f"Exact permutation over animals p = {p_exact:.3f} — the floor for "
+             "2 vs 2 is 1/6 = 0.167, so this is as extreme as the design can resolve.",
              fontsize=7, color="#4A5656", va="top")
+    fig.text(.02, .78, "Left and middle: the number is the section, the bar is that "
+             "animal's mean. Right: one point per animal, the unit of replication.",
+             fontsize=7, color="#4A5656", va="top")
+
+    per_animal.round(1).to_csv(SRC / f"gal_{tag}_per_animal.csv")
 
     fig.savefig(OUT / f"gal_{tag}_by_section.png")
     fig.savefig(OUT / f"gal_{tag}_by_section.pdf")
@@ -141,13 +193,17 @@ def main() -> int:
     print(f"=== {args.gene} in {args.cell_type} ===")
     print(per[["section", "animal", "group", "n_cells", "gal_cpm",
                "detect_pct", "ap_score"]].round(2).to_string(index=False))
-    print(f"\naged   mean {aged.mean():8.1f} CPM   range {aged.min():.0f}–{aged.max():.0f}")
-    print(f"adult  mean {adult.mean():8.1f} CPM   range {adult.min():.0f}–{adult.max():.0f}")
-    print(f"log2 aged/adult {lfc:+.3f}")
-    per_animal = per.groupby("animal")["gal_cpm"].mean()
-    print("\nper-animal means:")
-    for a in ANIMALS:
-        print(f"  {a:6s} {ANIMAL_META[a]['age_group']:6s} {per_animal[a]:8.1f}")
+    aged_s = per[per.group == "aged"]["gal_cpm"]
+    adult_s = per[per.group == "adult"]["gal_cpm"]
+    print(f"\nper section  aged  {aged_s.mean():8.0f} CPM  range {aged_s.min():.0f}-{aged_s.max():.0f}")
+    print(f"per section  adult {adult_s.mean():8.0f} CPM  range {adult_s.min():.0f}-{adult_s.max():.0f}")
+    print("\n=== animal level (the unit of replication) ===")
+    for a in per_animal.sort_values("gal_cpm", ascending=False).index:
+        print(f"  {a:6s} {per_animal.loc[a, 'group']:6s} {per_animal.loc[a, 'gal_cpm']:9,.0f} CPM")
+    print(f"\n  all aged above all adult: {separates}")
+    print(f"  log2 aged/adult {lfc:+.3f}  ({2**lfc:.2f}x)")
+    print(f"  exact permutation over animals p = {p_exact:.3f}  "
+          f"(floor for 2v2 is 1/6 = 0.167)")
     print(f"\nwrote {OUT / f'gal_{tag}_by_section.png'} (+ .pdf)")
     return 0
 
