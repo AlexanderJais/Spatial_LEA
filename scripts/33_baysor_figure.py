@@ -143,9 +143,16 @@ def main() -> int:
     centre_ml, centre_dv = float(dmh["ml"].median()), float(dmh["dv"].median())
     mol, bay, nb, (xcol, ycol), lo, hi = crop_data(crop_section, centre_ml, centre_dv)
 
-    fig = plt.figure(figsize=(7.2, 7.4))
-    gs = fig.add_gridspec(3, 3, height_ratios=[1.15, .92, .92],
-                          width_ratios=[1, 1, 1.05], hspace=.55, wspace=.45)
+    matched = pd.concat([pd.read_csv(RES / f"{s}_mixed_matched.csv")
+                         for s in args.sections], ignore_index=True)
+
+    fig = plt.figure(figsize=(7.2, 7.8))
+    gs = fig.add_gridspec(3, 3, height_ratios=[1.05, .80, .82],
+                          width_ratios=[1, 1, 1.02], hspace=.80, wspace=.58)
+    W3 = .26
+    C_VEN, C_BAY, C_ALL = VENDOR_C, BAYSOR_C, "#BFD4D4"
+    xs = np.arange(len(comp_stats))
+    sec_labels = [f"{r.section}\n{r.age_group}" for _, r in comp_stats.iterrows()]
 
     # (a) the same tissue, twice
     for i, (x, y, ids, title, un) in enumerate([
@@ -155,7 +162,7 @@ def main() -> int:
              bay["cell"].fillna(""), "Baysor", "")]):
         ax = fig.add_subplot(gs[0, i])
         if i == 0:
-            label(ax, "a", dx=-0.08)
+            label(ax, "a", dx=-0.08, dy=1.26)
         scatter_seg(ax, x, y, ids, lo, hi, title, un)
         for _, g in nb.groupby(nb.columns[0]):
             ax.plot(np.r_[g[xcol], g[xcol].iloc[:1]],
@@ -164,89 +171,113 @@ def main() -> int:
         if i == 0:
             ax.plot([lo[0] + 12, lo[0] + 32], [lo[1] + 12] * 2, lw=1.6, color="k")
             ax.text(lo[0] + 22, lo[1] + 17, "20 µm", ha="center", fontsize=5.5)
-    fig.text(0.055, 0.985, f"{crop_section}, dorsomedial hypothalamus — "
-             "black outlines are the measured DAPI nuclei, identical in both",
-             fontsize=6.5, color="#4A5656", va="top")
+            ax.annotate(f"{crop_section}, dorsomedial hypothalamus. Black outlines are\n"
+                        "the measured DAPI nuclei — identical in both panels;\n"
+                        "only what counts as belonging to them differs.",
+                        xy=(0, -.09), xycoords="axes fraction", fontsize=6,
+                        color="#5A6A6A", va="top", linespacing=1.5)
 
-    # (c) mixed identity  (upper right, next to the crops)
-    ax = fig.add_subplot(gs[0, 2]); label(ax, "c", dx=-0.30)
-    w, xs = .34, np.arange(len(comp_stats))
-    ax.bar(xs - w / 2, comp_stats["vendor_mixed_pct"], w, color=VENDOR_C, label="vendor")
-    ax.bar(xs + w / 2, comp_stats["baysor_mixed_pct"], w, color=BAYSOR_C, label="Baysor")
-    for j, r in comp_stats.iterrows():
-        ax.text(j - w / 2, r.vendor_mixed_pct + .7, f"{r.vendor_mixed_pct:.0f}",
-                ha="center", fontsize=5.5)
-        ax.text(j + w / 2, r.baysor_mixed_pct + .7, f"{r.baysor_mixed_pct:.0f}",
-                ha="center", fontsize=5.5)
-    ax.set_xticks(xs)
-    ax.set_xticklabels([f"{r.section}\n{r.age_group}" for _, r in comp_stats.iterrows()],
-                       fontsize=6)
+    # (b) mixed identity, three ways
+    ax = fig.add_subplot(gs[0, 2]); label(ax, "b", dx=-0.34, dy=1.26)
+    for off, vals, col in ((-W3, comp_stats["vendor_mixed_pct"], C_VEN),
+                           (0, matched["baysor_matched"], C_BAY),
+                           (W3, matched["baysor_all"], C_ALL)):
+        ax.bar(xs + off, vals, W3, color=col)
+        for j, v in enumerate(vals):
+            ax.text(j + off, v + .5, f"{v:.0f}", ha="center", fontsize=5.5)
+    ax.set_xticks(xs); ax.set_xticklabels(sec_labels, fontsize=6)
+    ax.set_ylim(0, 31)
     ax.set_ylabel("% of marker⁺ cells")
-    ax.set_title("Cells positive for GABAergic\nand glutamatergic markers", loc="left")
-    ax.legend(frameon=False, loc="upper right")
+    ax.set_title("Cells carrying GABAergic and\nglutamatergic markers at once", loc="left")
+    ax.annotate("Middle bar is the comparison that means anything:\n"
+                "matched objects, matched depth.",
+                xy=(0, -.24), xycoords="axes fraction", fontsize=5.8,
+                color="#5A6A6A", va="top")
 
-    # (b) cell size
-    ax = fig.add_subplot(gs[1, 0]); label(ax, "b")
+    # (c) cell size
+    ax = fig.add_subplot(gs[1, 0]); label(ax, "c", dx=-0.24)
     s0 = args.sections[0]
     ven = ref[(ref.obs["section"].astype(str) == s0)]
     ven_d = 2 * np.sqrt(ven.obs["cell_area"].to_numpy() / np.pi)
-    bay_d = 2 * np.sqrt(cells[s0]["area"].to_numpy() / np.pi)
-    bins = np.linspace(0, 40, 60)
-    ax.hist(ven_d, bins=bins, color=VENDOR_C, alpha=.85, label="vendor", density=True)
-    ax.hist(bay_d, bins=bins, histtype="step", lw=1.4, color=BAYSOR_C,
-            label="Baysor", density=True)
-    ax.axvspan(15, 25, color="#B4531A", alpha=.11)
-    ax.axvspan(8, 12, color="#6A3D9A", alpha=.11)
-    ax.text(20, ax.get_ylim()[1] * .93, "neuron\nsomata", ha="center", fontsize=5.5,
-            color="#B4531A")
-    ax.text(10, ax.get_ylim()[1] * .62, "glia", ha="center", fontsize=5.5, color="#6A3D9A")
+    bay_d = 2 * np.sqrt(cells[s0].loc[cells[s0]["prior_cell"] > 0, "area"].to_numpy() / np.pi)
+    bins = np.linspace(0, 36, 55)
+    ax.hist(ven_d, bins=bins, color=C_VEN, alpha=.85, density=True)
+    ax.hist(bay_d, bins=bins, histtype="step", lw=1.5, color=C_BAY, density=True)
+    ytop = ax.get_ylim()[1]
+    ax.axvspan(15, 25, color="#B4531A", alpha=.10)
+    ax.axvspan(8, 12, color="#6A3D9A", alpha=.10)
+    ax.text(20, ytop * .97, "neuron somata", ha="center", va="top", fontsize=5.5,
+            color="#B4531A", rotation=90)
+    ax.text(10, ytop * .97, "glia", ha="center", va="top", fontsize=5.5,
+            color="#6A3D9A", rotation=90)
     ax.set_xlabel("equivalent cell diameter (µm)"); ax.set_ylabel("density")
     ax.set_title(f"Cell size, {s0}", loc="left")
-    ax.legend(frameon=False)
 
-    # (d) Galr1 by nucleus
-    ax = fig.add_subplot(gs[1, 1:]); label(ax, "d", dx=-0.10)
+    # (d) depth -- why the pale bar in (b) is lower
+    ax = fig.add_subplot(gs[1, 1]); label(ax, "d", dx=-0.24)
+    for off, vals, col in ((-W3, matched["median_counts_vendor"], C_VEN),
+                           (0, matched["median_counts_matched"], C_BAY),
+                           (W3, comp_stats["baysor_median_counts"], C_ALL)):
+        ax.bar(xs + off, vals, W3, color=col)
+    ax.set_xticks(xs); ax.set_xticklabels(sec_labels, fontsize=6)
+    ax.set_ylabel("median transcripts / cell")
+    ax.set_title("Depth of those same cells", loc="left")
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in (C_VEN, C_BAY, C_ALL)]
+    ax.legend(handles, ["vendor cells",
+                        "Baysor cells on a measured nucleus",
+                        "all Baysor cells, incl. nucleus-free"],
+              frameon=False, fontsize=5.8, loc="upper center",
+              bbox_to_anchor=(.5, -.26), ncol=1, handlelength=1.1,
+              handletextpad=.4, labelspacing=.35)
+
+    # (e) Galr1 by nucleus
+    ax = fig.add_subplot(gs[1, 2]); label(ax, "e", dx=-0.28)
     nucs = [c[len("galr1_pct_"):-len("_vendor")] for c in comp_stats.columns
             if c.startswith("galr1_pct_") and c.endswith("_vendor")]
     v = comp_stats[[f"galr1_pct_{n}_vendor" for n in nucs]].mean().to_numpy()
     b = comp_stats[[f"galr1_pct_{n}_baysor" for n in nucs]].mean().to_numpy()
-    order = np.argsort(-v)
+    order = np.argsort(-v)[:7]
     nucs = [nucs[i] for i in order]; v, b = v[order], b[order]
-    xs = np.arange(len(nucs))
-    ax.bar(xs - w / 2, v, w, color=VENDOR_C, label="vendor")
-    ax.bar(xs + w / 2, b, w, color=BAYSOR_C, label="Baysor")
-    ax.set_xticks(xs); ax.set_xticklabels(nucs, fontsize=6, rotation=30, ha="right")
+    nx = np.arange(len(nucs))
+    ax.bar(nx - .19, v, .38, color=C_VEN)
+    ax.bar(nx + .19, b, .38, color=C_BAY)
+    ax.set_xticks(nx); ax.set_xticklabels(nucs, fontsize=6, rotation=40, ha="right")
     ax.set_ylabel("% of all Galr1 signal")
-    ax.set_title("Where the Galr1 signal sits (mean of the two sections)", loc="left")
-    ax.legend(frameon=False)
+    ax.set_title("Galr1 localisation is unchanged", loc="left")
     pd.DataFrame({"nucleus": nucs, "vendor": v.round(2),
-                  "baysor": b.round(2)}).to_csv(SRC / "baysor_fig_d_galr1.csv", index=False)
+                  "baysor": b.round(2)}).to_csv(SRC / "baysor_fig_e_galr1.csv", index=False)
 
-    # (e) composition
-    ax = fig.add_subplot(gs[2, :2]); label(ax, "e", dx=-0.09)
-    comp = pd.read_csv(RES / f"{s0}_composition.csv", index_col=0)
-    top = comp.reindex(comp["delta"].abs().sort_values(ascending=False).index).head(10)
-    top = top.sort_values("delta")
-    ys = np.arange(len(top))
-    ax.barh(ys, top["delta"], color=[BAYSOR_C if d > 0 else "#B4531A" for d in top["delta"]])
+    # (f) composition, matched set
+    ax = fig.add_subplot(gs[2, :2]); label(ax, "f", dx=-0.09)
+    comp = pd.read_csv(RES / f"{s0}_composition_matched.csv", index_col=0)
+    comp = comp.rename(columns={"delta_matched": "delta"})
+    tops = comp.reindex(comp["delta"].abs().sort_values(ascending=False).index).head(10)
+    tops = tops.sort_values("delta")
+    ys = np.arange(len(tops))
+    ax.barh(ys, tops["delta"], color=[C_BAY if d > 0 else "#B4531A" for d in tops["delta"]])
     ax.axvline(0, color="k", lw=.6)
-    ax.set_yticks(ys); ax.set_yticklabels(top.index, fontsize=6)
+    ax.set_yticks(ys); ax.set_yticklabels(tops.index, fontsize=6)
+    ax.set_xlim(-11, 11)
     ax.set_xlabel("change in share of cells (percentage points), Baysor − vendor")
-    ax.set_title(f"Composition shift, {s0} (labels transferred from the same reference)",
-                 loc="left")
+    ax.set_title(f"Composition, matched set ({s0})", loc="left")
+    ax.text(10.4, .2, "every shift under 1.3 pp.\nUsing all Baysor cells\ninstead moves"
+            "\nastrocytes by +9.8 pp —\nthat gain is fragments.",
+            fontsize=5.5, color="#7A8A8A", ha="right", va="bottom")
 
-    # (f) counts per cell -- the plain "did we gain signal" check
-    ax = fig.add_subplot(gs[2, 2]); label(ax, "f", dx=-0.30)
-    ax.bar(xs[:len(comp_stats)] - w / 2, comp_stats["vendor_median_counts"], w,
-           color=VENDOR_C, label="vendor")
-    ax.bar(xs[:len(comp_stats)] + w / 2, comp_stats["baysor_median_counts"], w,
-           color=BAYSOR_C, label="Baysor")
-    ax.set_xticks(xs[:len(comp_stats)])
-    ax.set_xticklabels(comp_stats["section"], fontsize=6)
-    ax.set_ylabel("median transcripts / cell")
-    ax.set_title("Signal per cell", loc="left")
+    # (g) mixed rate against depth
+    ax = fig.add_subplot(gs[2, 2]); label(ax, "g", dx=-0.34, dy=1.22)
+    d = pd.read_csv(RES / f"{s0}_mixed_by_depth.csv", index_col=0)
+    dx = np.arange(len(d))
+    ax.plot(dx, d["vendor_pct_mixed"], "o-", color=C_VEN, ms=3, lw=1.2, label="vendor")
+    ax.plot(dx, d["baysor_pct_mixed"], "o-", color=C_BAY, ms=3, lw=1.2, label="Baysor")
+    ax.set_xticks(dx)
+    ax.set_xticklabels([i.split(",")[0].strip("[") for i in d.index], fontsize=5.5)
+    ax.set_xlabel("transcripts per cell (bin start)")
+    ax.set_ylabel("% of marker⁺ cells mixed")
+    ax.set_title("Mixing rises steeply with depth;\nat matched depth Baysor is lower", loc="left")
+    ax.legend(frameon=False, loc="upper left")
 
-    fig.suptitle("Re-segmentation with Baysor", x=.02, ha="left", y=1.035,
+    fig.suptitle("Re-segmentation with Baysor", x=.02, ha="left", y=1.00,
                  fontsize=10, fontweight="bold")
     fig.savefig(OUT / "baysor_segmentation.png")
     fig.savefig(OUT / "baysor_segmentation.pdf")

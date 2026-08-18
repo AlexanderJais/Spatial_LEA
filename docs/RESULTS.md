@@ -7,6 +7,12 @@ Pipeline: `02_qc` → `03_cluster` → `04_annotate` → `07_calibrate_anchors` 
 `08_anatomy` → `09_mbh_atlas` → `10_galr1_nucleus` → `13_spatial_domains` →
 `18_extended_nuclei`. Tables under `results/`.
 
+> **Segmentation checked, see [SEGMENTATION.md](SEGMENTATION.md).** Every result
+> here rests on the vendor's nucleus + 5 µm dilation. Re-segmenting two
+> AP-matched sections with Baysor leaves the Galr1 conclusions unchanged — DMH
+> share 35.0% → 34.2%, GABA:Glut bias 3.74× → 3.85×, composition within 1.3 pp.
+> Nothing in this document needs redoing.
+
 > **Read §13 first.** Both model-based approaches to the rostro-caudal confound
 > failed audit — the correlation used in §9 and §11 is confounded with block, and
 > the regression correction extrapolates 5.4×. Those sections are kept for the
