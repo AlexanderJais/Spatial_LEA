@@ -46,7 +46,9 @@ import scanpy as sc
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
-from spatial_lea.io import AGED, ADULT, ANIMAL_META, BLOCKS, counts_matrix  # noqa: E402
+from spatial_lea.io import (  # noqa: E402
+    ADULT, AGED, ANIMAL_META, BLOCKS, ONE_PER_MOUSE, counts_matrix,
+)
 
 PROC = REPO / "data" / "processed"
 OUT = REPO / "results" / "gal_n8"
@@ -185,10 +187,21 @@ def report(res: pd.DataFrame, cal: pd.DataFrame, title: str) -> None:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--min-cells", type=int, default=30)
+    p.add_argument("--sections", nargs="*", default=None,
+                   help="restrict to these sections")
+    p.add_argument("--one-per-mouse", action="store_true",
+                   help=f"use the balanced set: {', '.join(ONE_PER_MOUSE)}")
     args = p.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
 
     adata = sc.read_h5ad(PROC / "hypothalamus_nuclei.h5ad")
+    sections = list(ONE_PER_MOUSE) if args.one_per_mouse else args.sections
+    if sections:
+        keep_s = adata.obs["section"].astype(str).isin(sections).to_numpy()
+        adata = adata[keep_s].copy()
+        print(f"Restricted to {len(sections)} sections, one per mouse:")
+        print("  " + ", ".join(sorted(sections)))
+        print(f"  {adata.n_obs:,} cells\n")
     adata.obs["pop"] = (adata.obs["nucleus_ext"].astype(str) + " | "
                         + adata.obs["cell_type"].astype(str))
 

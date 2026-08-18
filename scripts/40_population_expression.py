@@ -34,7 +34,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 from spatial_lea.io import (  # noqa: E402
-    ADULT, AGED, ANIMAL_META, BLOCKS, SECTION_ANIMAL, counts_matrix,
+    ADULT, AGED, ANIMAL_META, BLOCKS, ONE_PER_MOUSE, SECTION_ANIMAL, counts_matrix,
 )
 
 PROC = REPO / "data" / "processed"
@@ -107,13 +107,19 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--cell-type", default="Glut Prdm8/Cbln1")
     p.add_argument("--genes", nargs="+", default=["Galr1", "Gal"])
+    p.add_argument("--one-per-mouse", action="store_true")
+    p.add_argument("--suffix", default="")
     args = p.parse_args()
     OUT.mkdir(parents=True, exist_ok=True); SRC.mkdir(parents=True, exist_ok=True)
 
     adata = sc.read_h5ad(PROC / "hypothalamus_nuclei.h5ad")
+    if args.one_per_mouse:
+        keep_s = adata.obs["section"].astype(str).isin(ONE_PER_MOUSE).to_numpy()
+        adata = adata[keep_s].copy()
+        print("One slide per mouse: " + ", ".join(sorted(ONE_PER_MOUSE)))
     per = per_section(adata, args.cell_type, args.genes)
     stats = {g: stats_for(adata, args.cell_type, g) for g in args.genes}
-    tag = args.cell_type.lower().replace(" ", "_").replace("/", "_")
+    tag = args.cell_type.lower().replace(" ", "_").replace("/", "_") + args.suffix
     per.to_csv(SRC / f"{tag}_per_section.csv", index=False)
 
     n = len(args.genes)

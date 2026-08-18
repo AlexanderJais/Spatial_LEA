@@ -51,6 +51,12 @@ SUSPECT_SECTIONS = ("M399_2",)
 # The section the lab selected as best for each animal.
 SELECTED_SECTIONS = ("F536_1", "G073_2", "M399_3", "M493_2",
                      "K238_2", "P953_1", "F739_2", "Q378_2")
+# One slide per mouse, lab-chosen, so every animal contributes the same amount
+# of tissue.  The second cohort only ever had one section each, so using all
+# three first-cohort sections makes those animals' estimates ~3x less noisy than
+# the others; this set removes that asymmetry.
+ONE_PER_MOUSE = ("F536_3", "G073_2", "M399_1", "M493_1",
+                 "K238_2", "P953_1", "F739_2", "Q378_2")
 
 # Eight animals, four aged and four adult, in four blocks.  Sex is completely
 # confounded with panel and with segmentation chemistry -- all four males ran on
