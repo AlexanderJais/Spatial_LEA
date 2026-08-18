@@ -47,6 +47,25 @@ from sklearn.cluster import DBSCAN
 # is built from are in the wrong place, and recall costs nothing here.
 VENTRICLE_RULE = [("Gpr50", 2), ("Spag16", 2)]   # union
 ARC_RULE = [("Agrp", 2), ("Pomc", 5)]            # union; 89% / 77% precision
+
+# Absolute count cut-offs are not portable between panels.  The second cohort
+# ran a different panel whose Agrp probes detect roughly four times the signal,
+# so `Agrp >= 2` selected 1600-3100 cells there against 270-370 in the first
+# cohort.  Those extra low-specificity cells are scattered outside the ARC, and
+# because the ARC centroid both seeds the ventricle search and fixes the sign of
+# the ventral axis, they inverted the frame: the ARC came out at dv -290 to -950
+# instead of +140 to +200.
+#
+# The fix is to select a fixed *fraction* of each section's cells per marker
+# rather than a fixed count, which reproduces the first cohort's behaviour and
+# adapts to any panel.  Fractions are set to match the counts the absolute rule
+# gave on the sections it was calibrated against.
+# (gene, target fraction of cells, minimum count).  The fraction caps how many
+# cells a sensitive panel can contribute; the minimum count keeps specificity
+# where a marker is sparse.  Without the floor, a section with little Agrp puts
+# its top-fraction threshold at a single count and sweeps in the background.
+ARC_RULE_FRAC = [("Agrp", 0.0018, 2), ("Pomc", 0.0018, 5)]
+USE_RANK_ANCHORS = True
 VMH_RULE = [("Adcyap1", 8)]                      # 74% precision, 69% recall
 DMH_RULE = [("Grp", 3)]                          # 52% precision -- weakest anchor
 
@@ -96,13 +115,35 @@ def _marker_mask(counts: pd.DataFrame, rules) -> np.ndarray:
     return mask
 
 
+def _rank_marker_mask(counts: pd.DataFrame, rules) -> np.ndarray:
+    """Top fraction of cells per marker, floored at a minimum count.
+
+    The fraction caps how many cells a more sensitive panel contributes; the
+    floor preserves specificity where the marker is sparse.  Ties at the
+    threshold are all kept, so the realised fraction can exceed the target.
+    """
+    mask = np.zeros(len(counts), dtype=bool)
+    for gene, frac, floor in rules:
+        if gene not in counts.columns:
+            continue
+        values = counts[gene].to_numpy()
+        k = max(int(round(frac * len(values))), 20)
+        positive = values[values > 0]
+        if len(positive) == 0:
+            continue
+        cut = np.partition(positive, -min(k, len(positive)))[-min(k, len(positive))]
+        mask |= values >= max(cut, floor)
+    return mask
+
+
 def find_frame(xy: np.ndarray, counts: pd.DataFrame, section: str = "") -> Frame:
     """Locate the third-ventricle axis and the ventral direction."""
     lining = _marker_mask(counts, VENTRICLE_RULE)
     if lining.sum() < 50:
         raise ValueError(f"{section}: only {lining.sum()} ventricle-lining cells found")
 
-    arc = _marker_mask(counts, ARC_RULE)
+    arc = (_rank_marker_mask(counts, ARC_RULE_FRAC) if USE_RANK_ANCHORS
+           else _marker_mask(counts, ARC_RULE))
     if arc.sum() < 20:
         raise ValueError(f"{section}: only {arc.sum()} ARC anchor cells found")
     # ARC anchors are hypothalamus-specific, so their centroid seeds the search.

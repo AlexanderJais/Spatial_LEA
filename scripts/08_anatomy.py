@@ -31,8 +31,9 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 from spatial_lea.anatomy import (  # noqa: E402
-    ARC_RULE, DMH_RULE, NUCLEI, VMH_RULE, assign_nuclei, find_frame,
-    fit_nucleus_model, fit_nucleus_model_from_labels, to_frame,
+    ARC_RULE, ARC_RULE_FRAC, DMH_RULE, HYPOTHALAMIC_WINDOW, NUCLEI, VMH_RULE,
+    _rank_marker_mask, assign_nuclei, find_frame, fit_nucleus_model,
+    fit_nucleus_model_from_labels, in_window, to_frame,
 )
 from spatial_lea.io import (  # noqa: E402
     ANIMAL_META, SECTION_ANIMAL, SUSPECT_SECTIONS, counts_matrix, load_section,
@@ -42,6 +43,11 @@ from spatial_lea.io import (  # noqa: E402
 OUT = REPO / "results" / "anatomy"
 PROC = REPO / "data" / "processed"
 MIN_COUNTS, MIN_GENES = 10, 5
+# A frame is only trustworthy if the window it defines actually contains the
+# ARC.  A mis-fitted frame still produces coordinates and a plausible-looking
+# window somewhere else in the section, which is how four sections were nearly
+# analysed as hypothalamus without containing any.  Good sections score 65-97%.
+MIN_ARC_IN_WINDOW_PCT = 55.0
 ANCHOR_GENES = ["Gpr50", "Spag16", "Agrp", "Pomc", "Adcyap1", "Grp", "Ppp1r17"]
 
 
@@ -77,7 +83,8 @@ def main() -> int:
     parts, frames, coord_parts, count_parts = [], [], [], []
     print("=== Anatomical frame per section ===")
     print(f"{'section':9s} {'animal':7s} {'group':6s} {'cells':>7s} {'lining':>7s} "
-          f"{'elong':>6s} {'ventral direction':>20s}")
+          f"{'elong':>6s} {'n_arc':>6s} {'%ARC in win':>12s} {'ventral direction':>20s}")
+    frame_qc = []
     for section in sections:
         adata, counts = load_qc(section, keep_genes)
         frame = find_frame(adata.obsm["spatial"], counts, section)
@@ -91,11 +98,33 @@ def main() -> int:
         count_parts.append(counts)
         frames.append(frame)
 
+        arc = _rank_marker_mask(counts, ARC_RULE_FRAC)
+        inside = in_window(coords)
+        arc_pct = float(inside[arc].mean() * 100) if arc.sum() else 0.0
+        frame_qc.append({"section": section, "quality": round(frame.quality, 2),
+                         "n_arc": int(arc.sum()),
+                         "pct_arc_in_window": round(arc_pct, 1),
+                         "arc_dv_median": round(float(np.median(coords["dv"].to_numpy()[arc])), 0)})
+
         meta = ANIMAL_META[SECTION_ANIMAL[section]]
         flag = "  (flagged distorted)" if section in SUSPECT_SECTIONS else ""
+        if arc_pct < MIN_ARC_IN_WINDOW_PCT:
+            flag += "  <-- FRAME FAILED"
         print(f"{section:9s} {SECTION_ANIMAL[section]:7s} {meta['age_group']:6s} "
               f"{adata.n_obs:7d} {frame.n_lining:7d} {frame.quality:6.2f} "
+              f"{int(arc.sum()):6d} {arc_pct:11.1f}% "
               f"({frame.ventral_dir[0]:+.2f},{frame.ventral_dir[1]:+.2f}){flag}")
+
+    qc = pd.DataFrame(frame_qc)
+    qc.to_csv(OUT / "frame_qc.csv", index=False)
+    failed = qc[qc.pct_arc_in_window < MIN_ARC_IN_WINDOW_PCT]["section"].tolist()
+    if failed:
+        raise SystemExit(
+            f"\nFrame fitting failed for {failed}: under {MIN_ARC_IN_WINDOW_PCT}% of "
+            "ARC anchor cells fall inside the window those frames define, so the "
+            "window is not on the hypothalamus. Refusing to build an atlas on it.")
+    print(f"\nAll {len(qc)} frames place {qc.pct_arc_in_window.min():.0f}-"
+          f"{qc.pct_arc_in_window.max():.0f}% of their ARC anchors inside the window.")
 
     merged_pre = ad.concat(parts, label="section", keys=sections, index_unique="-", merge="same", join="inner")
     coords_pre = pd.DataFrame(
