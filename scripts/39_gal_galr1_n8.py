@@ -111,7 +111,12 @@ def screen(adata, key: str, min_cells: int) -> tuple[pd.DataFrame, pd.DataFrame]
             continue
         cpm = np.log2(mat.div(mat.sum(axis=1), axis=0) * 1e6 + 1)
         res = blocked_stats(cpm)
-        strict = (res.blocks_agree == 4) & res.separates & (res.margin >= MIN_MARGIN)
+        # Two bars.  The blocked one is primary: it never compares across
+        # cohorts, so it cannot be produced by the panel or chemistry
+        # difference.  Complete separation is stronger but does compare across
+        # them, so it is reported as a bonus rather than a requirement.
+        consistent = res.blocks_agree == 4
+        strict = consistent & res.separates & (res.margin >= MIN_MARGIN)
 
         cal.append({"population": pop, "min_cells": min(n.values()),
                     "genes_tested": int(expressed.sum()),
@@ -132,7 +137,8 @@ def screen(adata, key: str, min_cells: int) -> tuple[pd.DataFrame, pd.DataFrame]
                 "separates": bool(r.separates), "margin": round(float(r.margin), 3),
                 "p_exact": round(float(r.p_exact), 4),
                 "lfc_pct_rank": round(float(rank.get(g, np.nan)), 1),
-                "passes": bool(strict[g]),
+                "all_blocks_agree": bool(consistent[g]),
+                "passes_strict": bool(strict[g]),
                 "panel_strict_pct": cal[-1]["pct_strict"],
                 **{f"lfc_{b}": round(float(r[f"lfc_{b}"]), 2) for b in BLOCKS},
             })
@@ -150,21 +156,30 @@ def report(res: pd.DataFrame, cal: pd.DataFrame, title: str) -> None:
     print(f"  both, margin >= 0.25    {cal.pct_strict.mean():5.1f}% of genes  "
           "<- the rate any hit has to beat")
 
+    cols = ["population", "min_cells", "mean_lfc", "fold", "p_blocked", "p_exact",
+            "lfc_pct_rank", "separates", "lfc_B1", "lfc_B2", "lfc_B3", "lfc_B4"]
     for gene in GENES:
         sub = res[res.gene == gene]
         if not len(sub):
             continue
-        hits = sub[sub.passes].reindex(
-            sub[sub.passes]["mean_lfc"].abs().sort_values(ascending=False).index)
-        print(f"\n--- {gene}: {len(hits)} of {len(sub)} populations change ---")
+        hits = sub[sub.all_blocks_agree]
+        hits = hits.reindex(hits["mean_lfc"].abs().sort_values(ascending=False).index)
+        print(f"\n--- {gene}: {len(hits)} of {len(sub)} populations change in the same "
+              f"direction in all four blocks ---")
         if not len(hits):
             print("    none")
-            continue
-        with pd.option_context("display.width", 230, "display.max_colwidth", 34):
-            print(hits[["population", "min_cells", "mean_lfc", "fold", "blocks_agree",
-                        "margin", "p_blocked", "p_exact", "lfc_pct_rank",
-                        "panel_strict_pct", "lfc_B1", "lfc_B2", "lfc_B3", "lfc_B4"]]
-                  .to_string(index=False))
+        else:
+            with pd.option_context("display.width", 230, "display.max_colwidth", 34):
+                print(hits[cols].to_string(index=False))
+            n_strict = int(hits.passes_strict.sum())
+            print(f"    of these, {n_strict} also separate the four aged animals "
+                  "completely from the four adults")
+        near = sub[~sub.all_blocks_agree & (sub.blocks_agree == "3/4")]
+        near = near.reindex(near["mean_lfc"].abs().sort_values(ascending=False).index)
+        if len(near):
+            print(f"    3 of 4 blocks agreeing ({len(near)}), largest first:")
+            with pd.option_context("display.width", 230, "display.max_colwidth", 34):
+                print(near[cols].head(5).to_string(index=False))
 
 
 def main() -> int:
