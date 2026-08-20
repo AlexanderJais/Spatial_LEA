@@ -64,6 +64,7 @@ import scanpy as sc
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.lines import Line2D  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
@@ -73,7 +74,8 @@ from spatial_lea.figstyle import (  # noqa: E402
     NUCLEUS_LABEL, POP, TISSUE, bare, panel, scalebar, use_style,
 )
 from spatial_lea.io import (  # noqa: E402
-    ADULT as A_ADULT, AGED as A_AGED, BLOCKS, ONE_PER_MOUSE, counts_matrix,
+    ADULT as A_ADULT, AGED as A_AGED, ANIMAL_META, BLOCKS, ONE_PER_MOUSE,
+    SECTION_ANIMAL, counts_matrix,
 )
 
 PROC = REPO / "data" / "processed"
@@ -285,13 +287,15 @@ def main() -> int:
     # Subregions as a faint ground, largest first so no region is buried by a
     # bigger one drawn after it.
     present = [k for k in NUCLEUS_LABEL if (on & (nuc == k)).any()]
-    ax.scatter(ml[on], dv[on], s=.9, c=TISSUE, linewidths=0, rasterized=True)
+    ax.scatter(ml[on], dv[on], s=.7, c=TISSUE, linewidths=0, rasterized=True)
     for key in sorted(present, key=lambda k: int((on & (nuc == k)).sum()), reverse=True):
         m = on & (nuc == key)
-        ax.scatter(ml[m], dv[m], s=.9, c=NUCLEUS_COLOUR[key], alpha=.30,
+        ax.scatter(ml[m], dv[m], s=.7, c=NUCLEUS_COLOUR[key], alpha=.32,
                    linewidths=0, rasterized=True)
-    # The receptor itself, in two tints: one transcript, or more than one.
-    for lo, hi, colour, size in ((1, 1, GALR1_LOW, 1.9), (2, 10 ** 6, GALR1, 3.1)):
+    # The receptor itself, in two tints: one transcript, or more than one.  A
+    # single transcript is within reach of the panel's background rate, so it is
+    # shown but not given the weight of a cell carrying several.
+    for lo, hi, colour, size in ((1, 1, GALR1_LOW, .9), (2, 10 ** 6, GALR1, 1.8)):
         m = on & (galr1 >= lo) & (galr1 <= hi)
         ax.scatter(ml[m], dv[m], s=size, c=colour, linewidths=0, rasterized=True)
     m = on & is_pop
@@ -311,13 +315,24 @@ def main() -> int:
     ax.set_xlim(-1500, 1500); ax.set_ylim(-100, 1800)
     ax.set_aspect("equal"); bare(ax)
     scalebar(ax, 500, "500 µm")
-    for j, (text, colour) in enumerate((
-            ("$\\it{Galr1}$ 1 transcript", GALR1_LOW),
-            ("$\\it{Galr1}$ 2+", GALR1),
-            (f"{POPNAME}", POP))):
-        ax.annotate(text, xy=(-1470, 1760 - j * 105), fontsize=5.4, color=colour,
-                    va="top", ha="left", fontweight="bold")
-    ax.set_title(f"one section ({rep})", loc="left", pad=2)
+    # Legend below the panel: the section fills the frame, so any key placed
+    # inside it would sit on tissue and hide what it describes.  Laid out by
+    # matplotlib rather than by hand-placed text, which collides as soon as a
+    # label's rendered width changes.
+    keys = [
+        Line2D([], [], marker="o", linestyle="none", markersize=1.9,
+               color=GALR1_LOW, label="$\\it{Galr1}$ 1 transcript"),
+        Line2D([], [], marker="o", linestyle="none", markersize=2.6,
+               color=GALR1, label="$\\it{Galr1}$ 2+"),
+        Line2D([], [], marker="o", linestyle="none", markersize=3.4,
+               markerfacecolor="none", markeredgecolor=POP, markeredgewidth=.6,
+               label=POPNAME),
+    ]
+    ax.legend(handles=keys, loc="upper left", bbox_to_anchor=(0, .02), ncol=2,
+              frameon=False, fontsize=5.2, handletextpad=.3, columnspacing=1.1,
+              labelspacing=.35, borderpad=0, borderaxespad=0)
+    group = ANIMAL_META[SECTION_ANIMAL[rep]]["age_group"]
+    ax.set_title(f"one section: {rep}, {group}", loc="left", pad=2, x=.05)
 
     # (b) which cell types carry Galr1 at all
     ax = fig.add_subplot(top[1]); panel(ax, "b", dx=-0.46, dy=1.13)
@@ -352,8 +367,9 @@ def main() -> int:
         ax.scatter(scr.lfc[mask], ys[mask], s=24, color=colour, linewidths=0,
                    zorder=4)
         for y, row in zip(ys[mask], scr[mask].itertuples()):
+            short = str(row.cell_type).split(" (")[0]
             label = (POPNAME if row.cell_type == POPNAME
-                     else f"{row.cell_type} ({row.pct_pos:.0f}% pos.)")
+                     else f"{short} ({row.pct_pos:.0f}% pos.)")
             ax.annotate(label, (row.lfc, y), xytext=(5, 0),
                         textcoords="offset points", fontsize=5.2, va="center",
                         ha="left", color=colour, fontweight="bold")
@@ -370,8 +386,10 @@ def main() -> int:
     ax.set_yticks([]); ax.set_ylim(-1, len(scr))
     # Limits follow the data: a fixed window silently drops any cell type that
     # moves further than the window was drawn for.
+    # Right-hand room is for the labels on whatever passed, which sit at the top
+    # of the ranking; without it the name of the result runs off the panel.
     ax.set_xlim(min(-0.9, float(scr.lfc.min()) - .15),
-                max(1.9, float(scr.lfc.max()) + .15))
+                max(1.9, float(scr.lfc.max()) + 1.15))
     ax.set_xlabel("$\\it{Galr1}$, aged / adult (log$_2$)")
     ax.set_ylabel(f"{len(scr)} cell types")
     ax.set_title(f"{int(passes.sum())} of {len(scr)} change", loc="left", pad=2)
@@ -401,12 +419,13 @@ def main() -> int:
     ax.set_yticklabels(top_marks.index, fontsize=5.6, style="italic")
     ax.tick_params(axis="y", length=0)
     ax.set_xlabel("log$_2$ vs rest of window")
+    ax.set_xlim(0, float(top_marks.max()) * 1.42)
+    ax.set_title("what it is", loc="left", pad=2)
     hm = hypomap_match()
     if hm is not None:
-        ax.annotate(f"HypoMap C185: {hm[0]}\nSpearman ρ = {hm[1]:.2f}",
-                    xy=(.97, .06), xycoords="axes fraction", fontsize=5.4,
-                    color=INK, ha="right", va="bottom")
-    ax.set_title("what it is", loc="left", pad=2)
+        ax.annotate(f"HypoMap C185\n{hm[0]}\nSpearman ρ = {hm[1]:.2f}",
+                    xy=(.99, .04), xycoords="axes fraction", fontsize=5.3,
+                    color=INK, ha="right", va="bottom", linespacing=1.5)
 
     # (f, g) the receptors in that population
     for j, gene in enumerate(MAIN_GENES):
