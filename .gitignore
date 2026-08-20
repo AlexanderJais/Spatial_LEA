@@ -1,5 +1,15 @@
 data/
-results/
+results/*
+# Rendered manuscript figures are versioned: they are the deliverable, and a
+# figure nobody can find in the repository is a figure that has to be rebuilt
+# from raw data to be looked at.  Everything else under results/ is derived
+# intermediates and stays out.
+!results/figures/
+results/figures/*
+!results/figures/*.pdf
+!results/figures/*.png
+!results/figures/source_data/
+!results/hypomap/
 *.h5ad
 *.h5
 *.zarr/
