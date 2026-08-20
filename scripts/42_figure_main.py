@@ -12,11 +12,13 @@ Panels:
      a section -- panel b is the section
   b  one representative section, with every neuron of this type on it
   c  which subregion they belong to: enrichment over the whole window, DMH
-     highest
+     highest.  Computed here, from the parcellation panel a draws
   d  what they are, matched against HypoMap at the C185 level
-  e  Galr1 tested in every cell type with enough cells: of twenty, one moves
-     consistently and separates the animals, which is what makes the result a
-     statement about this population rather than about ageing hypothalamus
+  e  Galr1 tested in every cell type with enough cells -- the same statistic,
+     blocking and thresholds everywhere -- which is what makes the result a
+     statement about this population rather than about ageing hypothalamus.
+     Also computed here; whatever passes the criterion is drawn and named,
+     including anything besides this population
   f  Galr1 in that population, one point per animal, paired within block
   g  Ghsr, the second receptor these neurons carry, behaves the same way
 
@@ -26,6 +28,12 @@ Choices made by rule rather than by eye:
     and right of the midline; a torn or folded section scores low.  Restricting
     that test to the analysed window is not enough -- a section can be perfectly
     symmetric inside the window and badly damaged outside it.
+  * a cell type enters panel e when every animal contributes at least
+    MIN_CELLS_PER_ANIMAL of it.  The comparison is blocked within animal pairs,
+    so a type one animal lacks cannot be tested at all, and a type thin in one
+    animal is tested mostly on that animal's noise.  The rule is a property of
+    the design, not of any result: it is applied before the statistics are
+    looked at.
   * panel a paints the subregions largest first.  Eight sections are pooled into
     one frame, so cells from different animals share pixels and whichever region
     is drawn last takes them.  In the order the colour table happens to list
@@ -78,6 +86,11 @@ ANIMALS = list(A_ADULT) + list(A_AGED)
 KEY_GENES = ["Galr1", "Ghrh", "Ghsr", "Galr3"]
 MAIN_GENES = ["Galr1", "Ghsr"]
 CONTEXT_MARKERS = 8
+# A cell type enters the specificity test (panel e) only when every animal
+# contributes at least this many of it.  The test is blocked within animal
+# pairs, so a type missing from one animal cannot be tested at all, and a type
+# that is thin in one animal is tested mostly on that animal's noise.
+MIN_CELLS_PER_ANIMAL = 30
 
 
 def blocked_stats(cpm: pd.DataFrame) -> pd.DataFrame:
@@ -99,6 +112,59 @@ def blocked_stats(cpm: pd.DataFrame) -> pd.DataFrame:
     for b in BLOCKS:
         out[f"lfc_{b}"] = lfc.loc[b]
     return out
+
+
+def regional_enrichment(is_pop: np.ndarray, nucleus: np.ndarray) -> pd.DataFrame:
+    """Each subregion's share of this population, over the population's share of
+    the whole window.
+
+    The denominator is the entire analysed window, unnamed tuberal territory
+    included: the question is where the population concentrates within the
+    tissue this study looked at, not within the named nuclei only.
+    """
+    overall = float(is_pop.mean())
+    rows = []
+    for name in NUCLEUS_LABEL:
+        m = nucleus == name
+        if not m.any():
+            continue
+        n_pop, n_region = int((is_pop & m).sum()), int(m.sum())
+        rows.append({"nucleus": name, "n_pop": n_pop, "n_region": n_region,
+                     "pct_of_region": round(n_pop / n_region * 100, 3),
+                     "enrichment": round((n_pop / n_region) / overall, 3)})
+    return pd.DataFrame(rows).sort_values("enrichment", ascending=False)
+
+
+def galr1_by_celltype(counts: np.ndarray, var: np.ndarray, cell_types: np.ndarray,
+                      animals: np.ndarray) -> pd.DataFrame:
+    """Galr1, tested by exactly the same rule in every cell type the design can
+    support.
+
+    This is what makes the result a statement about one population rather than
+    about ageing hypothalamus, so the test must not be one the population was
+    picked to pass: same statistic, same blocking, same thresholds everywhere.
+    """
+    gene_index = int(np.flatnonzero(var == "Galr1")[0])
+    rows = []
+    for name in pd.unique(cell_types):
+        if str(name).startswith(("unlabelled", "unresolved")):
+            continue
+        sel = cell_types == name
+        per_animal = [int((sel & (animals == a)).sum()) for a in ANIMALS]
+        if min(per_animal) < MIN_CELLS_PER_ANIMAL:
+            continue
+        mat = pd.DataFrame({a: counts[sel & (animals == a)].sum(axis=0)
+                            for a in ANIMALS}, index=var).T
+        cpm = np.log2(mat.div(mat.sum(axis=1), axis=0) * 1e6 + 1)
+        r = blocked_stats(cpm).loc["Galr1"]
+        rows.append({
+            "cell_type": name, "min_cells": min(per_animal),
+            "lfc": round(float(r.lfc), 3), "fold": round(float(2 ** r.lfc), 2),
+            "blocks": int(r.blocks), "p": round(float(r.p), 4),
+            "margin": round(float(r.margin), 3),
+            "pct_pos": round(float((counts[sel][:, gene_index] > 0).mean() * 100), 1),
+        })
+    return pd.DataFrame(rows).sort_values("lfc", ascending=False)
 
 
 def paired_panel(ax, values: dict, ylabel: str, title: str) -> None:
@@ -130,6 +196,17 @@ def main() -> int:
     ml, dv = win.obs["ml"].to_numpy(), win.obs["dv"].to_numpy()
     counts = counts_matrix(win)
     var = win.var_names.to_numpy()
+    cell_types = win.obs["cell_type"].astype(str).to_numpy()
+    nuc = win.obs["nucleus_ext"].astype(str).to_numpy()
+
+    # Panels c and e are derived here rather than read from a CSV nobody can
+    # regenerate.  Both files used to arrive as committed source data with no
+    # script behind them, which meant the figure could not be rebuilt from the
+    # data it claims to show.
+    enr = regional_enrichment(is_pop, nuc)
+    enr.to_csv(SRC / "population_regional_enrichment.csv", index=False)
+    by_ct = galr1_by_celltype(counts, var, cell_types, animals)
+    by_ct.to_csv(SRC / "galr1_by_celltype.csv", index=False)
 
     mat = pd.DataFrame({a: counts[is_pop & (animals == a)].sum(axis=0)
                         for a in ANIMALS}, index=var).T
@@ -165,7 +242,6 @@ def main() -> int:
 
     # (a) the registered subregions this panel resolves
     ax = fig.add_subplot(top[0]); panel(ax, "a", dx=-0.05, dy=1.13)
-    nuc = win.obs["nucleus_ext"].astype(str).to_numpy()
     for key in ("edge", "fibre", "TUseg"):
         m = nuc == key
         if m.any():
@@ -208,7 +284,6 @@ def main() -> int:
 
     # (c) which subregion
     ax = fig.add_subplot(top[2]); panel(ax, "c", dx=-0.42, dy=1.13)
-    enr = pd.read_csv(SRC / "population_regional_enrichment.csv")
     enr = enr.sort_values("enrichment")
     ys = np.arange(len(enr))
     ax.barh(ys, enr.enrichment, height=.68,
@@ -243,20 +318,34 @@ def main() -> int:
 
     # (e) is the increase specific?  Galr1 in every cell type with enough cells.
     ax = fig.add_subplot(bot[1]); panel(ax, "e", dx=-0.34)
-    by_ct = pd.read_csv(SRC / "galr1_by_celltype.csv").sort_values("lfc")
+    by_ct = by_ct.sort_values("lfc")
     ys = np.arange(len(by_ct))
     passes = ((by_ct.blocks == 4) & (by_ct.margin > 0)).to_numpy()
     ax.axvline(0, color=INK, lw=.5)
     ax.scatter(by_ct.lfc[~passes], ys[~passes], s=10, color="#B0B0B0",
                linewidths=0, zorder=3)
-    ax.scatter(by_ct.lfc[passes], ys[passes], s=24, color=POP, linewidths=0,
-               zorder=4)
-    for y, row in zip(ys[passes], by_ct[passes].itertuples()):
-        ax.annotate("this population", (row.lfc, y), xytext=(6, 0),
-                    textcoords="offset points", fontsize=5.4, va="center",
-                    ha="left", color=POP, fontweight="bold")
+    # Whatever else passes the same criterion is drawn and named too.  Marking
+    # every passing type "this population" would be true only while exactly one
+    # passes, and the panel's whole claim is that the criterion is applied
+    # blind, so a second passer has to be visible rather than absorbed.
+    is_pop_row = (by_ct.cell_type == POPNAME).to_numpy()
+    for mask, colour in ((passes & is_pop_row, POP), (passes & ~is_pop_row, INK)):
+        if not mask.any():
+            continue
+        ax.scatter(by_ct.lfc[mask], ys[mask], s=24, color=colour, linewidths=0,
+                   zorder=4)
+        for y, row in zip(ys[mask], by_ct[mask].itertuples()):
+            label = ("this population" if row.cell_type == POPNAME
+                     else f"{row.cell_type} ({row.pct_pos:.0f}% $\\it{{Galr1}}^+$)")
+            ax.annotate(label, (row.lfc, y), xytext=(6, 0),
+                        textcoords="offset points", fontsize=5.4, va="center",
+                        ha="left", color=colour, fontweight="bold")
     ax.set_yticks([]); ax.set_ylim(-1, len(by_ct))
-    ax.set_xlim(-0.75, 1.9)
+    # Limits follow the data: a fixed window silently drops any cell type that
+    # moves further than the window was drawn for, which is the one result that
+    # would most need to be seen.
+    ax.set_xlim(min(-0.75, float(by_ct.lfc.min()) - .15),
+                max(1.9, float(by_ct.lfc.max()) + .15))
     ax.set_xlabel("$\\it{Galr1}$, aged / adult (log$_2$)")
     ax.set_ylabel(f"{len(by_ct)} cell types")
     ax.set_title(f"{int(passes.sum())} of {len(by_ct)} change", loc="left", pad=2)
