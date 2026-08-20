@@ -186,7 +186,16 @@ def main() -> int:
         adata.write_h5ad(cache)
 
     from sklearn.decomposition import PCA
-    pcs = PCA(n_components=30, random_state=SEED).fit_transform(niche.to_numpy())
+    # A niche is described by the cell-type composition of its neighbourhood, so
+    # the feature count is however many cell types this run resolved -- not a
+    # constant.  Asking for 30 components assumed at least 30 types exist and
+    # raised outright when 27 were resolved, which is a legitimate outcome of
+    # 04_annotate dropping clusters whose markers did not support any label.
+    n_comp = min(30, niche.shape[1])
+    if n_comp < 30:
+        print(f"  {niche.shape[1]} cell types in the niche descriptors: "
+              f"using {n_comp} components rather than 30")
+    pcs = PCA(n_components=n_comp, random_state=SEED).fit_transform(niche.to_numpy())
 
     print("\n=== Choosing the number of domains ===")
     print("   smallest domain should stay at nucleus scale, not fragment the meninges")
