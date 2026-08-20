@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
-"""Main figure: Galr1 upregulation in dorsal hypothalamic Ghrh neurons with age.
+"""Figure 1: which MBH cells upregulate Galr1 with age.
 
-Single biological conclusion the figure supports:
+The question the study asks, in the order a reader needs it answered:
 
-    A defined glutamatergic population of the dorsal hypothalamus -- Galr1+,
-    Ghrh+, Ghsr+, Galr3+ -- upregulates Galr1 with age, without loss of neurons.
+    Galr1 is present in the mediobasal hypothalamus.  Which cells carry it, and
+    which of them change between adult and aged mice?
+
+    Of every cell type the design can test, one moves: a glutamatergic
+    Otp+/Cbln1+/Prdm8+ population of the DMH, which gains Galr1 and Ghsr with
+    age.  The population that carries the most Galr1 -- GABA Gal/Galr1 -- does
+    not move, so this is not "the aged hypothalamus has more Galr1".
 
 Panels:
-  a  where the neurons can be placed: the registered subregions, every cell
-     from all eight animals pooled in the shared anatomical frame.  This is not
-     a section -- panel b is the section
-  b  one representative section, with every neuron of this type on it
-  c  which subregion they belong to: enrichment over the whole window, DMH
-     highest.  Computed here, from the parcellation panel a draws
-  d  what they are, matched against HypoMap at the C185 level
-  e  Galr1 tested in every cell type with enough cells -- the same statistic,
-     blocking and thresholds everywhere -- which is what makes the result a
-     statement about this population rather than about ageing hypothalamus.
-     Also computed here; whatever passes the criterion is drawn and named,
-     including anything besides this population
+  a  one representative section: every cell, the Galr1+ cells among them, and
+     this population outlined on top, inside the registered subregions
+  b  which cell types carry Galr1 at all, as the fraction of their cells that
+     are positive -- the landscape the screen is run over
+  c  the screen: Galr1 aged versus adult in every cell type with enough cells,
+     the same statistic and thresholds everywhere.  Whatever passes is named
+  d  where the population that moved sits: enrichment by subregion, DMH highest
+  e  what it is: its markers against the rest of the window, and its HypoMap
+     correspondence
   f  Galr1 in that population, one point per animal, paired within block
   g  Ghsr, the second receptor these neurons carry, behaves the same way
 
@@ -28,21 +30,20 @@ Choices made by rule rather than by eye:
     and right of the midline; a torn or folded section scores low.  Restricting
     that test to the analysed window is not enough -- a section can be perfectly
     symmetric inside the window and badly damaged outside it.
-  * a cell type enters panel e when every animal contributes at least
+  * a cell type enters the screen when every animal contributes at least
     MIN_CELLS_PER_ANIMAL of it.  The comparison is blocked within animal pairs,
     so a type one animal lacks cannot be tested at all, and a type thin in one
     animal is tested mostly on that animal's noise.  The rule is a property of
     the design, not of any result: it is applied before the statistics are
     looked at.
-  * panel a paints the subregions largest first.  Eight sections are pooled into
-    one frame, so cells from different animals share pixels and whichever region
-    is drawn last takes them.  In the order the colour table happens to list
-    them, the DMH (9 707 cells in the window) was painted over by its three
-    larger neighbours -- LHA 28 530, ZI 13 532, DHA_PH 10 648, all drawn after
-    it -- so it lost pixels at exactly the borders the parcellation is least
-    sure of, and the nucleus panel c makes a claim about read as smaller than
-    the assignment behind that claim.  Size order is a rule that applies to
+  * panel a tints the subregions largest first.  Whichever region is drawn last
+    takes the shared pixels, and in the order the colour table happens to list
+    them the DMH -- the region panel d makes a claim about -- was painted over
+    by LHA, ZI and DHA_PH, its three larger neighbours, at exactly the borders
+    the parcellation is least sure of.  Size order is a rule that applies to
     every region rather than a thumb on the scale for this one.
+  * panels c, d and e are computed here, not read from a stored table, so the
+    whole figure regenerates from the data it claims to show.
 
 Adult is plotted first throughout, as the reference condition.  Fos falls
 steeply in these neurons in aged mice, but these animals are untreated, so
@@ -68,8 +69,8 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 from spatial_lea.figstyle import (  # noqa: E402
-    ADULT, AGED as C_AGED, FULL, INK, NUCLEUS_COLOUR, NUCLEUS_LABEL, POP,
-    TISSUE, bare, panel, scalebar, use_style,
+    ADULT, AGED as C_AGED, FULL, GALR1, GALR1_LOW, INK, NUCLEUS_COLOUR,
+    NUCLEUS_LABEL, POP, TISSUE, bare, panel, scalebar, use_style,
 )
 from spatial_lea.io import (  # noqa: E402
     ADULT as A_ADULT, AGED as A_AGED, BLOCKS, ONE_PER_MOUSE, counts_matrix,
@@ -78,18 +79,25 @@ from spatial_lea.io import (  # noqa: E402
 PROC = REPO / "data" / "processed"
 OUT = REPO / "results" / "figures"
 SRC = OUT / "source_data"
+HYPOMAP = REPO / "results" / "hypomap" / "hypomap_C185_named_all_celltypes.csv"
 POPNAME = "Glut Prdm8/Cbln1"
+# The type that carries the most Galr1 in this tissue.  Named in the figure as
+# the comparison the result has to survive: if ageing simply raised Galr1, this
+# is the population it would show up in first.
+GALR1_RICH = "GABA Gal/Galr1"
 # Adult first: the reference condition.
 ANIMALS = list(A_ADULT) + list(A_AGED)
 # Priority order for this study; Galr1 leads, then the peptide that names the
 # population, then the other two receptors it carries.
 KEY_GENES = ["Galr1", "Ghrh", "Ghsr", "Galr3"]
 MAIN_GENES = ["Galr1", "Ghsr"]
-CONTEXT_MARKERS = 8
-# A cell type enters the specificity test (panel e) only when every animal
-# contributes at least this many of it.  The test is blocked within animal
-# pairs, so a type missing from one animal cannot be tested at all, and a type
-# that is thin in one animal is tested mostly on that animal's noise.
+RECEPTORS = ("Galr1", "Ghsr", "Galr3")
+MARKERS_SHOWN = 8
+LANDSCAPE_SHOWN = 12
+# A cell type enters the screen only when every animal contributes at least this
+# many of it.  The test is blocked within animal pairs, so a type missing from
+# one animal cannot be tested at all, and a type that is thin in one animal is
+# tested mostly on that animal's noise.
 MIN_CELLS_PER_ANIMAL = 30
 
 
@@ -137,14 +145,15 @@ def regional_enrichment(is_pop: np.ndarray, nucleus: np.ndarray) -> pd.DataFrame
 
 def galr1_by_celltype(counts: np.ndarray, var: np.ndarray, cell_types: np.ndarray,
                       animals: np.ndarray) -> pd.DataFrame:
-    """Galr1, tested by exactly the same rule in every cell type the design can
-    support.
+    """Galr1, measured and tested by the same rule in every cell type the design
+    can support.
 
-    This is what makes the result a statement about one population rather than
-    about ageing hypothalamus, so the test must not be one the population was
-    picked to pass: same statistic, same blocking, same thresholds everywhere.
+    ``pct_pos`` and ``cpm`` are the landscape -- who carries the receptor.
+    ``lfc``/``blocks``/``margin``/``p`` are the age test.  Both come from one
+    pass so the panel that asks "which cells carry Galr1" and the panel that
+    asks "which of them change" cannot be built on different cell sets.
     """
-    gene_index = int(np.flatnonzero(var == "Galr1")[0])
+    gene = int(np.flatnonzero(var == "Galr1")[0])
     rows = []
     for name in pd.unique(cell_types):
         if str(name).startswith(("unlabelled", "unresolved")):
@@ -157,14 +166,38 @@ def galr1_by_celltype(counts: np.ndarray, var: np.ndarray, cell_types: np.ndarra
                             for a in ANIMALS}, index=var).T
         cpm = np.log2(mat.div(mat.sum(axis=1), axis=0) * 1e6 + 1)
         r = blocked_stats(cpm).loc["Galr1"]
+        pooled = counts[sel]
         rows.append({
-            "cell_type": name, "min_cells": min(per_animal),
+            "cell_type": name, "n_cells": int(sel.sum()),
+            "min_cells": min(per_animal),
+            "pct_pos": round(float((pooled[:, gene] > 0).mean() * 100), 1),
+            "cpm": round(float(np.log2(pooled[:, gene].sum() / pooled.sum() * 1e6 + 1)), 2),
             "lfc": round(float(r.lfc), 3), "fold": round(float(2 ** r.lfc), 2),
             "blocks": int(r.blocks), "p": round(float(r.p), 4),
             "margin": round(float(r.margin), 3),
-            "pct_pos": round(float((counts[sel][:, gene_index] > 0).mean() * 100), 1),
         })
     return pd.DataFrame(rows).sort_values("lfc", ascending=False)
+
+
+def population_markers(counts: np.ndarray, var: np.ndarray,
+                       is_pop: np.ndarray) -> pd.Series:
+    """Log2 enrichment of every gene in the population against the rest of the
+    window, which is what the identity claim rests on."""
+    inside = counts[is_pop].sum(axis=0) / counts[is_pop].sum() * 1e6
+    outside = counts[~is_pop].sum(axis=0) / counts[~is_pop].sum() * 1e6
+    return pd.Series(np.log2((inside + 1) / (outside + 1)), index=var)
+
+
+def hypomap_match() -> tuple[str, float] | None:
+    """Best HypoMap C185 correspondence for this population, if 44_query_hypomap
+    has been run."""
+    if not HYPOMAP.exists():
+        return None
+    hm = pd.read_csv(HYPOMAP, index_col=0)
+    if POPNAME not in hm.columns:
+        return None
+    best = hm[POPNAME].sort_values(ascending=False)
+    return best.index[0].split(": ", 1)[-1], float(best.iloc[0])
 
 
 def paired_panel(ax, values: dict, ylabel: str, title: str) -> None:
@@ -190,23 +223,20 @@ def main() -> int:
 
     win = sc.read_h5ad(PROC / "hypothalamus_nuclei.h5ad")
     win = win[win.obs["section"].astype(str).isin(ONE_PER_MOUSE)].copy()
-    is_pop = (win.obs["cell_type"].astype(str) == POPNAME).to_numpy()
+    cell_types = win.obs["cell_type"].astype(str).to_numpy()
+    if POPNAME not in set(cell_types):
+        raise SystemExit(
+            f"'{POPNAME}' is not among this run's cell types. 04_annotate.py "
+            "matches clusters to labels on marker evidence; check its report at "
+            "results/annotation/cluster_label_matching.csv before going further.")
+    is_pop = cell_types == POPNAME
     animals = win.obs["animal"].astype(str).to_numpy()
     sections = win.obs["section"].astype(str).to_numpy()
     ml, dv = win.obs["ml"].to_numpy(), win.obs["dv"].to_numpy()
+    nuc = win.obs["nucleus_ext"].astype(str).to_numpy()
     counts = counts_matrix(win)
     var = win.var_names.to_numpy()
-    cell_types = win.obs["cell_type"].astype(str).to_numpy()
-    nuc = win.obs["nucleus_ext"].astype(str).to_numpy()
-
-    # Panels c and e are derived here rather than read from a CSV nobody can
-    # regenerate.  Both files used to arrive as committed source data with no
-    # script behind them, which meant the figure could not be rebuilt from the
-    # data it claims to show.
-    enr = regional_enrichment(is_pop, nuc)
-    enr.to_csv(SRC / "population_regional_enrichment.csv", index=False)
-    by_ct = galr1_by_celltype(counts, var, cell_types, animals)
-    by_ct.to_csv(SRC / "galr1_by_celltype.csv", index=False)
+    galr1 = counts[:, int(np.flatnonzero(var == "Galr1")[0])]
 
     mat = pd.DataFrame({a: counts[is_pop & (animals == a)].sum(axis=0)
                         for a in ANIMALS}, index=var).T
@@ -223,6 +253,15 @@ def main() -> int:
            for a in ANIMALS}
     pd.DataFrame({"abundance": pct}).loc[ANIMALS].to_csv(SRC / "fig_main_abundance.csv")
 
+    # Panels c, d and e are derived here rather than read from a stored table,
+    # so the whole figure regenerates from the data it claims to show.
+    enr = regional_enrichment(is_pop, nuc)
+    enr.to_csv(SRC / "population_regional_enrichment.csv", index=False)
+    by_ct = galr1_by_celltype(counts, var, cell_types, animals)
+    by_ct.to_csv(SRC / "galr1_by_celltype.csv", index=False)
+    markers = population_markers(counts, var, is_pop)
+    markers.sort_values(ascending=False).to_csv(SRC / "population_markers.csv")
+
     # --- representative section: the most intact tissue, whole section --------
     whole = sc.read_h5ad(PROC / "mbh_anatomical.h5ad", backed="r")
     wsec = whole.obs["section"].astype(str).to_numpy()
@@ -235,124 +274,143 @@ def main() -> int:
     rep = max(balance, key=balance.get)
     whole.file.close()
 
-    fig = plt.figure(figsize=(FULL, 5.0))
-    outer = fig.add_gridspec(2, 1, height_ratios=[1.05, .95], hspace=.60)
-    top = outer[0].subgridspec(1, 3, width_ratios=[1.30, 1.05, .95], wspace=.36)
-    bot = outer[1].subgridspec(1, 4, width_ratios=[1.35, 1.15, .95, .95], wspace=.72)
+    fig = plt.figure(figsize=(FULL, 5.1))
+    outer = fig.add_gridspec(2, 1, height_ratios=[1.05, .95], hspace=.62)
+    top = outer[0].subgridspec(1, 3, width_ratios=[1.55, 1.05, 1.15], wspace=.55)
+    bot = outer[1].subgridspec(1, 4, width_ratios=[1.0, 1.25, .85, .85], wspace=.75)
 
-    # (a) the registered subregions this panel resolves
-    ax = fig.add_subplot(top[0]); panel(ax, "a", dx=-0.05, dy=1.13)
-    for key in ("edge", "fibre", "TUseg"):
-        m = nuc == key
-        if m.any():
-            ax.scatter(ml[m], dv[m], s=.45, c=TISSUE, linewidths=0, rasterized=True)
-    present = [k for k in NUCLEUS_LABEL if (nuc == k).any()]
-    # Largest first, so no region is hidden by a bigger one drawn after it.
-    for key in sorted(present, key=lambda k: int((nuc == k).sum()), reverse=True):
-        m = nuc == key
-        ax.scatter(ml[m], dv[m], s=.45, c=NUCLEUS_COLOUR[key], linewidths=0,
-                   rasterized=True)
+    # (a) one section: the tissue, the receptor, and the population that moved
+    ax = fig.add_subplot(top[0]); panel(ax, "a", dx=-0.04, dy=1.13)
+    on = sections == rep
+    # Subregions as a faint ground, largest first so no region is buried by a
+    # bigger one drawn after it.
+    present = [k for k in NUCLEUS_LABEL if (on & (nuc == k)).any()]
+    ax.scatter(ml[on], dv[on], s=.9, c=TISSUE, linewidths=0, rasterized=True)
+    for key in sorted(present, key=lambda k: int((on & (nuc == k)).sum()), reverse=True):
+        m = on & (nuc == key)
+        ax.scatter(ml[m], dv[m], s=.9, c=NUCLEUS_COLOUR[key], alpha=.30,
+                   linewidths=0, rasterized=True)
+    # The receptor itself, in two tints: one transcript, or more than one.
+    for lo, hi, colour, size in ((1, 1, GALR1_LOW, 1.9), (2, 10 ** 6, GALR1, 3.1)):
+        m = on & (galr1 >= lo) & (galr1 <= hi)
+        ax.scatter(ml[m], dv[m], s=size, c=colour, linewidths=0, rasterized=True)
+    m = on & is_pop
+    ax.scatter(ml[m], dv[m], s=15, facecolors="none", edgecolors=POP,
+               linewidths=.55, rasterized=True)
     for key in present:
-        m = nuc == key
-        # Direct label on the right-hand side of the bilateral structure, so the
-        # map is readable without a colour key.
+        m = on & (nuc == key)
+        if m.sum() < 40:
+            continue
         side = ml[m] > 0 if (ml[m] > 0).sum() > 30 else ml[m] < 0
         ax.annotate(NUCLEUS_LABEL[key],
                     (np.median(ml[m][side]), np.median(dv[m][side])),
-                    fontsize=5.6, color=INK, ha="center", va="center",
+                    fontsize=5.4, color=INK, ha="center", va="center",
                     fontweight="bold",
-                    bbox=dict(boxstyle="round,pad=0.12", fc="white", ec="none",
-                              alpha=.72))
+                    bbox=dict(boxstyle="round,pad=0.10", fc="white", ec="none",
+                              alpha=.70))
     ax.set_xlim(-1500, 1500); ax.set_ylim(-100, 1800)
     ax.set_aspect("equal"); bare(ax)
     scalebar(ax, 500, "500 µm")
-    ax.set_title("registered subregions, 8 animals pooled", loc="left", pad=2)
+    for j, (text, colour) in enumerate((
+            ("$\\it{Galr1}$ 1 transcript", GALR1_LOW),
+            ("$\\it{Galr1}$ 2+", GALR1),
+            (f"{POPNAME}", POP))):
+        ax.annotate(text, xy=(-1470, 1760 - j * 105), fontsize=5.4, color=colour,
+                    va="top", ha="left", fontweight="bold")
+    ax.set_title(f"one section ({rep})", loc="left", pad=2)
 
-    # (b) representative image
-    ax = fig.add_subplot(top[1]); panel(ax, "b", dx=-0.09, dy=1.13)
-    m = sections == rep
-    ax.scatter(ml[m & ~is_pop], dv[m & ~is_pop], s=.8, c=TISSUE, linewidths=0,
-               rasterized=True)
-    ax.scatter(ml[m & is_pop], dv[m & is_pop], s=5.5, c=POP, linewidths=0,
-               rasterized=True)
-    ax.set_xlim(-1500, 1500); ax.set_ylim(-100, 1800)
-    ax.set_aspect("equal"); bare(ax)
-    scalebar(ax, 500, "500 µm")
-    ax.annotate("Otp$^+$ Cbln1$^+$ neurons", xy=(-1460, 1740), fontsize=5.8,
-                color=POP, va="top", ha="left")
-    ax.set_title("representative image", loc="left", pad=2, x=.03)
+    # (b) which cell types carry Galr1 at all
+    ax = fig.add_subplot(top[1]); panel(ax, "b", dx=-0.46, dy=1.13)
+    land = by_ct.sort_values("pct_pos", ascending=False).head(LANDSCAPE_SHOWN)
+    land = land.sort_values("pct_pos")
+    ys = np.arange(len(land))
+    colours = [POP if n == POPNAME else INK if n == GALR1_RICH else "#C4C4C4"
+               for n in land.cell_type]
+    ax.barh(ys, land.pct_pos, height=.68, color=colours)
+    ax.set_yticks(ys); ax.set_yticklabels(land.cell_type, fontsize=5.2)
+    for tick, n in zip(ax.get_yticklabels(), land.cell_type):
+        tick.set_fontweight("bold" if n in (POPNAME, GALR1_RICH) else "normal")
+    ax.tick_params(axis="y", length=0)
+    ax.set_xlabel("% of cells $\\it{Galr1}^+$")
+    ax.set_title("which cells carry it", loc="left", pad=2)
 
-    # (c) which subregion
-    ax = fig.add_subplot(top[2]); panel(ax, "c", dx=-0.42, dy=1.13)
-    enr = enr.sort_values("enrichment")
-    ys = np.arange(len(enr))
-    ax.barh(ys, enr.enrichment, height=.68,
-            color=[POP if n == "DMH" else "#C4C4C4" for n in enr.nucleus])
+    # (c) the screen: which of them change with age
+    ax = fig.add_subplot(top[2]); panel(ax, "c", dx=-0.30, dy=1.13)
+    scr = by_ct.sort_values("lfc")
+    ys = np.arange(len(scr))
+    passes = ((scr.blocks == 4) & (scr.margin > 0)).to_numpy()
+    ax.axvline(0, color=INK, lw=.5)
+    ax.scatter(scr.lfc[~passes], ys[~passes], s=10, color="#B0B0B0",
+               linewidths=0, zorder=3)
+    # Whatever passes the criterion is drawn and named.  Marking every passing
+    # type "this population" would be true only while exactly one passes, and
+    # the panel's claim is that the criterion was applied blind.
+    is_pop_row = (scr.cell_type == POPNAME).to_numpy()
+    for mask, colour in ((passes & is_pop_row, POP), (passes & ~is_pop_row, INK)):
+        if not mask.any():
+            continue
+        ax.scatter(scr.lfc[mask], ys[mask], s=24, color=colour, linewidths=0,
+                   zorder=4)
+        for y, row in zip(ys[mask], scr[mask].itertuples()):
+            label = (POPNAME if row.cell_type == POPNAME
+                     else f"{row.cell_type} ({row.pct_pos:.0f}% pos.)")
+            ax.annotate(label, (row.lfc, y), xytext=(5, 0),
+                        textcoords="offset points", fontsize=5.2, va="center",
+                        ha="left", color=colour, fontweight="bold")
+    # The population that carries the most Galr1 is named whether it moves or
+    # not: if ageing simply raised Galr1, this is where it would show.
+    rich = scr[scr.cell_type == GALR1_RICH]
+    if len(rich):
+        y = int(ys[(scr.cell_type == GALR1_RICH).to_numpy()][0])
+        ax.scatter(rich.lfc, [y], s=16, color=INK, linewidths=0, zorder=4)
+        ax.annotate(f"{GALR1_RICH}\n({float(rich.pct_pos.iloc[0]):.0f}% pos., unchanged)",
+                    (float(rich.lfc.iloc[0]), y), xytext=(-5, 0),
+                    textcoords="offset points", fontsize=5.2, va="center",
+                    ha="right", color=INK)
+    ax.set_yticks([]); ax.set_ylim(-1, len(scr))
+    # Limits follow the data: a fixed window silently drops any cell type that
+    # moves further than the window was drawn for.
+    ax.set_xlim(min(-0.9, float(scr.lfc.min()) - .15),
+                max(1.9, float(scr.lfc.max()) + .15))
+    ax.set_xlabel("$\\it{Galr1}$, aged / adult (log$_2$)")
+    ax.set_ylabel(f"{len(scr)} cell types")
+    ax.set_title(f"{int(passes.sum())} of {len(scr)} change", loc="left", pad=2)
+
+    # (d) where the population that moved sits
+    ax = fig.add_subplot(bot[0]); panel(ax, "d", dx=-0.44)
+    reg = enr.sort_values("enrichment")
+    ys = np.arange(len(reg))
+    ax.barh(ys, reg.enrichment, height=.68,
+            color=[POP if n == "DMH" else "#C4C4C4" for n in reg.nucleus])
     ax.axvline(1, color=INK, lw=.5)
     ax.set_yticks(ys)
-    ax.set_yticklabels([NUCLEUS_LABEL.get(n, n) for n in enr.nucleus])
-    for tick, n in zip(ax.get_yticklabels(), enr.nucleus):
+    ax.set_yticklabels([NUCLEUS_LABEL.get(n, n) for n in reg.nucleus])
+    for tick, n in zip(ax.get_yticklabels(), reg.nucleus):
         tick.set_fontweight("bold" if n == "DMH" else "normal")
     ax.tick_params(axis="y", length=0)
     ax.set_xlabel("enrichment over the whole window")
     ax.set_title("most enriched in DMH", loc="left", pad=2)
 
-    # (d) HypoMap identity, C185 level
-    ax = fig.add_subplot(bot[0]); panel(ax, "d", dx=-0.40)
-    hm = pd.read_csv(REPO / "results" / "hypomap" /
-                     "hypomap_C185_named_all_celltypes.csv", index_col=0)
-    top_hm = hm[POPNAME].sort_values(ascending=False).head(6)[::-1]
-    names = [i.split(": ", 1)[-1] for i in top_hm.index]
-    # top_hm is reversed for plotting, so the best match is the LAST bar.
-    ax.barh(range(len(top_hm)), top_hm.values, height=.68,
-            color=["#C4C4C4"] * (len(top_hm) - 1) + [POP])
-    ax.set_yticks(range(len(top_hm)))
-    ax.set_yticklabels(names, fontsize=5.4)
-    for tick, keep in zip(ax.get_yticklabels(),
-                          [False] * (len(top_hm) - 1) + [True]):
-        tick.set_fontweight("bold" if keep else "normal")
-    ax.tick_params(axis="y", length=0)
-    ax.set_xlim(.6, .95)
-    ax.set_xlabel("Spearman ρ to HypoMap C185")
-    ax.set_title("HypoMap identity", loc="left", pad=2)
-
-    # (e) is the increase specific?  Galr1 in every cell type with enough cells.
+    # (e) what it is
     ax = fig.add_subplot(bot[1]); panel(ax, "e", dx=-0.34)
-    by_ct = by_ct.sort_values("lfc")
-    ys = np.arange(len(by_ct))
-    passes = ((by_ct.blocks == 4) & (by_ct.margin > 0)).to_numpy()
-    ax.axvline(0, color=INK, lw=.5)
-    ax.scatter(by_ct.lfc[~passes], ys[~passes], s=10, color="#B0B0B0",
-               linewidths=0, zorder=3)
-    # Whatever else passes the same criterion is drawn and named too.  Marking
-    # every passing type "this population" would be true only while exactly one
-    # passes, and the panel's whole claim is that the criterion is applied
-    # blind, so a second passer has to be visible rather than absorbed.
-    is_pop_row = (by_ct.cell_type == POPNAME).to_numpy()
-    for mask, colour in ((passes & is_pop_row, POP), (passes & ~is_pop_row, INK)):
-        if not mask.any():
-            continue
-        ax.scatter(by_ct.lfc[mask], ys[mask], s=24, color=colour, linewidths=0,
-                   zorder=4)
-        for y, row in zip(ys[mask], by_ct[mask].itertuples()):
-            label = ("this population" if row.cell_type == POPNAME
-                     else f"{row.cell_type} ({row.pct_pos:.0f}% $\\it{{Galr1}}^+$)")
-            ax.annotate(label, (row.lfc, y), xytext=(6, 0),
-                        textcoords="offset points", fontsize=5.4, va="center",
-                        ha="left", color=colour, fontweight="bold")
-    ax.set_yticks([]); ax.set_ylim(-1, len(by_ct))
-    # Limits follow the data: a fixed window silently drops any cell type that
-    # moves further than the window was drawn for, which is the one result that
-    # would most need to be seen.
-    ax.set_xlim(min(-0.75, float(by_ct.lfc.min()) - .15),
-                max(1.9, float(by_ct.lfc.max()) + .15))
-    ax.set_xlabel("$\\it{Galr1}$, aged / adult (log$_2$)")
-    ax.set_ylabel(f"{len(by_ct)} cell types")
-    ax.set_title(f"{int(passes.sum())} of {len(by_ct)} change", loc="left", pad=2)
+    top_marks = markers.nlargest(MARKERS_SHOWN).sort_values()
+    ys = np.arange(len(top_marks))
+    ax.barh(ys, top_marks.values, height=.68,
+            color=[GALR1 if g in RECEPTORS else "#C4C4C4" for g in top_marks.index])
+    ax.set_yticks(ys)
+    ax.set_yticklabels(top_marks.index, fontsize=5.6, style="italic")
+    ax.tick_params(axis="y", length=0)
+    ax.set_xlabel("log$_2$ vs rest of window")
+    hm = hypomap_match()
+    if hm is not None:
+        ax.annotate(f"HypoMap C185: {hm[0]}\nSpearman ρ = {hm[1]:.2f}",
+                    xy=(.97, .06), xycoords="axes fraction", fontsize=5.4,
+                    color=INK, ha="right", va="bottom")
+    ax.set_title("what it is", loc="left", pad=2)
 
     # (f, g) the receptors in that population
     for j, gene in enumerate(MAIN_GENES):
-        ax = fig.add_subplot(bot[j + 2]); panel(ax, "fg"[j], dx=-0.40)
+        ax = fig.add_subplot(bot[j + 2]); panel(ax, "fg"[j], dx=-0.42)
         r = stats.loc[gene]
         paired_panel(ax, cpm[gene].to_dict(), f"$\\it{{{gene}}}$ (log$_2$ CPM)",
                      f"{2 ** r.lfc:.2f}×  $P$ = {r.p:.3f}")
@@ -364,19 +422,28 @@ def main() -> int:
     print("whole-section bilateral balance (1.0 = symmetric):")
     for s, v in sorted(balance.items(), key=lambda kv: -kv[1]):
         print(f"   {s:8s} {v:.3f}{'   <- shown' if s == rep else ''}")
-    print("\nsubregions drawn in panel a (pooled over the eight sections):")
-    for key in sorted(present, key=lambda k: int((nuc == k).sum()), reverse=True):
+    print("\nsubregions in the window (pooled over the eight sections):")
+    in_window = [k for k in NUCLEUS_LABEL if (nuc == k).any()]
+    for key in sorted(in_window, key=lambda k: int((nuc == k).sum()), reverse=True):
         m = nuc == key
         a_ml, d = np.abs(ml[m]), dv[m]
         print(f"   {key:7s} {int(m.sum()):6d} cells   "
               f"|ml| {np.percentile(a_ml, 5):4.0f}-{np.percentile(a_ml, 95):4.0f}"
               f"   dv {np.percentile(d, 5):4.0f}-{np.percentile(d, 95):4.0f} um")
 
-    print(f"\n{int(is_pop.sum())} neurons across 8 animals")
+    print(f"\n{int(is_pop.sum())} {POPNAME} neurons across 8 animals, "
+          f"{float(by_ct.loc[by_ct.cell_type == POPNAME, 'pct_pos'].iloc[0]):.0f}% "
+          "of them Galr1+")
     for g in KEY_GENES:
         if g in stats.index:
             r = stats.loc[g]
             print(f"  {g:6s} {2 ** r.lfc:.2f}x  blocks {int(r.blocks)}/4  P {r.p:.4f}")
+
+    print(f"\nGalr1 screen over {len(by_ct)} cell types "
+          f"(>= {MIN_CELLS_PER_ANIMAL} cells in every animal):")
+    shown = by_ct[["cell_type", "n_cells", "pct_pos", "fold", "blocks", "p", "margin"]]
+    with pd.option_context("display.width", 200):
+        print(shown.to_string(index=False))
     print(f"\nwrote {OUT / 'figure_main.pdf'} (+ .png)")
     return 0
 

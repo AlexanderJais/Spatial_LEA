@@ -24,6 +24,11 @@ ADULT = "#9ECAE1"
 # Cell identity. The population this manuscript is about; grey is everything
 # else, so the eye is never asked to compare two saturated colours.
 POP = "#4B2E83"
+# The receptor this study is about, wherever it is shown as a measurement rather
+# than as a group difference: two tints, so a cell carrying one transcript and a
+# cell carrying several are not drawn as the same observation.
+GALR1 = "#B4531A"
+GALR1_LOW = "#E3B48F"
 TISSUE = "#DDDDDD"      # cells not central to the message
 OTHER_CELLS = "#BFBFBF"  # typed cells in a zoomed field, other than POP
 INK = "#1A1A1A"

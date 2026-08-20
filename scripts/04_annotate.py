@@ -144,18 +144,24 @@ def match_clusters(clusters: list[str]) -> tuple[dict, pd.DataFrame]:
                        for e in entries] for c in clusters])
     rows, cols = linear_sum_assignment(-score)
 
+    # One entry per cluster, and there may be more clusters than entries: this
+    # clustering produced 34 where the table holds 33, so a cluster can come out
+    # of the assignment with nothing matched to it at all.  It is unresolved,
+    # exactly like one that matched too weakly -- never silently dropped from
+    # the mapping, which would raise a KeyError three lines later.
     mapping, report = {}, []
-    for r, c in zip(rows, cols):
-        cluster, entry = clusters[r], entries[c]
-        value = score[r, c]
-        label, klass, _ = ANNOTATION[entry]
-        if value < MIN_MATCH:
+    matched = {clusters[r]: (entries[c], score[r, c]) for r, c in zip(rows, cols)}
+    for cluster in clusters:
+        entry, value = matched.get(cluster, (None, 0.0))
+        if entry is None or value < MIN_MATCH:
             label, klass = f"unresolved_{cluster}", "Excluded"
+        else:
+            label, klass, _ = ANNOTATION[entry]
         mapping[cluster] = (label, klass)
         report.append({
             "cluster": cluster, "label": label, "class": klass,
             "match": round(float(value), 2),
-            "table_id": entry,
+            "table_id": entry if entry is not None else "",
             "id_would_have_said": ANNOTATION.get(cluster, ("<no entry>",))[0],
             "id_agrees": entry == cluster,
             "top_markers": ", ".join(sorted(top[cluster])),
