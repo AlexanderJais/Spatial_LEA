@@ -99,9 +99,28 @@ def use_style() -> None:
 
 
 def panel(ax, letter: str, dx: float = -0.24, dy: float = 1.10) -> None:
-    """Bold lower-case panel letter, positioned in axes fraction."""
+    """Bold lower-case panel letter, positioned in axes fraction.
+
+    Prefer ``panel_letters`` for a multi-panel figure: positioning each letter
+    against its own axes puts them at ragged heights and offsets, because axes
+    differ in how much room their tick labels take and an equal-aspect panel
+    shrinks inside the cell it was given.
+    """
     ax.text(dx, dy, letter, transform=ax.transAxes, fontsize=8,
             fontweight="bold", va="top", ha="left", color=INK)
+
+
+def panel_letters(fig, pairs, dx: float = 0.0, dy: float = 0.012) -> None:
+    """Place panel letters on the grid rather than on the axes.
+
+    Each letter goes at the top-left of the cell its panel was allotted, so
+    letters in a row share a baseline and letters in a column share a margin,
+    whatever the axes inside those cells do.
+    """
+    for letter, ax in pairs:
+        cell = ax.get_subplotspec().get_position(fig)
+        fig.text(cell.x0 + dx, cell.y1 + dy, letter, fontsize=8,
+                 fontweight="bold", va="bottom", ha="left", color=INK)
 
 
 def scalebar(ax, length_um: float, label: str, frac=(0.06, 0.06), lw=1.2) -> None:

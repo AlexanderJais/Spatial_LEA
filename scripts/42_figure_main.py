@@ -62,7 +62,7 @@ sys.path.insert(0, str(REPO / "src"))
 
 from spatial_lea.figstyle import (  # noqa: E402
     ADULT, AGED as C_AGED, FULL, GALR1, INK, NUCLEUS_COLOUR, NUCLEUS_LABEL, POP,
-    TISSUE, bare, panel, scalebar, use_style,
+    TISSUE, bare, panel_letters, scalebar, use_style, wash,
 )
 from spatial_lea.io import (  # noqa: E402
     ADULT as A_ADULT, AGED as A_AGED, BLOCKS, ONE_PER_MOUSE, counts_matrix,
@@ -176,15 +176,14 @@ def animal_heatmap(fig, ax, z: pd.DataFrame, cbar_label: str, ylabels,
     cb.outline.set_visible(False)
 
 
-def frame_panel(ax, ml, dv, nuc, present, coloured: bool):
-    """The shared anatomical frame; subregions coloured, or all tissue grey."""
+def frame_panel(ax, ml, dv, nuc, present, pale: bool):
+    """The shared anatomical frame.  ``pale`` washes the subregions towards
+    white, which keeps the anatomy readable under cells plotted on top."""
     ax.scatter(ml, dv, s=.45, c=TISSUE, linewidths=0, rasterized=True)
-    if coloured:
-        for key in sorted(present, key=lambda k: int((nuc == k).sum()),
-                          reverse=True):
-            m = nuc == key
-            ax.scatter(ml[m], dv[m], s=.45, c=NUCLEUS_COLOUR[key], linewidths=0,
-                       rasterized=True)
+    for key in sorted(present, key=lambda k: int((nuc == k).sum()), reverse=True):
+        m = nuc == key
+        colour = [wash(NUCLEUS_COLOUR[key])] if pale else NUCLEUS_COLOUR[key]
+        ax.scatter(ml[m], dv[m], s=.45, c=colour, linewidths=0, rasterized=True)
     ax.set_xlim(-1500, 1500); ax.set_ylim(-100, 1800)
     ax.set_aspect("equal"); bare(ax)
     scalebar(ax, 500, "500 µm")
@@ -223,16 +222,18 @@ def main() -> int:
         SRC / "population_age_genes.csv")
     movers = pop_stats[pop_stats.changes].sort_values("lfc", ascending=False)
 
-    fig = plt.figure(figsize=(FULL, 5.7))
-    outer = fig.add_gridspec(2, 1, height_ratios=[1.0, 1.0], hspace=.45)
-    top = outer[0].subgridspec(1, 3, width_ratios=[1.15, 1.15, 1.40], wspace=.78)
-    bot = outer[1].subgridspec(1, 4, width_ratios=[.62, 1.05, 1.15, 1.25],
-                               wspace=.80)
+    # Two rows could not give the maps the width their aspect ratio needs -- a
+    # 3000 x 1900 um field in a narrow cell leaves the panel floating in white.
+    fig = plt.figure(figsize=(FULL, 7.9))
+    outer = fig.add_gridspec(3, 1, height_ratios=[1.0, 1.12, 1.30], hspace=.40)
+    row1 = outer[0].subgridspec(1, 2, wspace=.10)
+    row2 = outer[1].subgridspec(1, 2, width_ratios=[2.45, 1.0], wspace=.50)
+    row3 = outer[2].subgridspec(1, 3, width_ratios=[1.0, 1.25, 1.30], wspace=.72)
     present = [k for k in NUCLEUS_LABEL if (nuc == k).any()]
 
     # (a) what was analysed
-    ax = fig.add_subplot(top[0]); panel(ax, "a", dx=-0.04, dy=1.12)
-    frame_panel(ax, ml, dv, nuc, present, coloured=True)
+    ax_a = ax = fig.add_subplot(row1[0])
+    frame_panel(ax, ml, dv, nuc, present, pale=False)
     for key in present:
         m = nuc == key
         side = ml[m] > 0 if (ml[m] > 0).sum() > 30 else ml[m] < 0
@@ -246,21 +247,21 @@ def main() -> int:
                 fontsize=5.6, color=INK, ha="left", va="top")
 
     # (b) where the cell type that changes sits
-    ax = fig.add_subplot(top[1]); panel(ax, "b", dx=-0.04, dy=1.12)
-    frame_panel(ax, ml, dv, nuc, present, coloured=False)
+    ax_b = ax = fig.add_subplot(row1[1])
+    frame_panel(ax, ml, dv, nuc, present, pale=True)
     ax.scatter(ml[is_pop], dv[is_pop], s=4.2, c=POP, linewidths=.2,
                edgecolors="white", rasterized=True)
     ax.annotate(POPNAME, xy=(0, -0.02), xycoords="axes fraction", fontsize=5.6,
                 color=POP, ha="left", va="top", fontweight="bold")
 
     # (c) Galr1 per animal, every testable cell type
-    ax = fig.add_subplot(top[2]); panel(ax, "c", dx=-0.60, dy=1.12)
+    ax_c = ax = fig.add_subplot(row2[0])
     z = zscore(per_animal)
     animal_heatmap(fig, ax, z, "$\\it{Galr1}$ (z across animals)",
                    list(z.index), bold=list(screen.significant))
 
     # (d) Galr1 in that cell type
-    ax = fig.add_subplot(bot[0]); panel(ax, "d", dx=-0.78, dy=1.12)
+    ax_d = ax = fig.add_subplot(row2[1])
     values = pop_cpm["Galr1"].to_dict()
     for a_aged, a_adult in BLOCKS.values():
         ax.plot([0, 1], [values[a_adult], values[a_aged]], color="#C9C9C9",
@@ -277,7 +278,7 @@ def main() -> int:
     ax.set_title(POPNAME, loc="left", pad=3, color=POP, fontweight="bold")
 
     # (e) the same cells in expression space, with the HypoMap identity
-    ax = fig.add_subplot(bot[1]); panel(ax, "e", dx=-0.10, dy=1.12)
+    ax_e = ax = fig.add_subplot(row3[0])
     ref = sc.read_h5ad(PROC / "mbh_roi_annotated.h5ad")
     umap = ref.obsm["X_umap"]
     pop_u = ref.obs["cell_type"].astype(str).to_numpy() == POPNAME
@@ -295,7 +296,7 @@ def main() -> int:
     del ref
 
     # (f) how well that identity holds
-    ax = fig.add_subplot(bot[2]); panel(ax, "f", dx=-0.52, dy=1.12)
+    ax_f = ax = fig.add_subplot(row3[1])
     shown = best.head(HYPOMAP_SHOWN)[::-1]
     ax.barh(range(len(shown)), shown.values, height=.70,
             color=["#C4C4C4"] * (len(shown) - 1) + [POP])
@@ -306,9 +307,10 @@ def main() -> int:
     ax.tick_params(axis="y", length=0)
     ax.set_xlim(.6, float(shown.max()) * 1.05)
     ax.set_xlabel("Spearman ρ")
+    ax.set_title("HypoMap", loc="left", pad=2)
 
     # (g) what else changes in this population
-    ax = fig.add_subplot(bot[3]); panel(ax, "g", dx=-0.46, dy=1.12)
+    ax_g = ax = fig.add_subplot(row3[2])
     lv = np.log2(pop_cpm[movers.index] + 1).T
     zg = zscore(lv)
     if len(zg) > 2:
@@ -317,6 +319,9 @@ def main() -> int:
         zg = zg.iloc[leaves_list(link)]
     animal_heatmap(fig, ax, zg, "z across animals",
                    [f"$\\it{{{g}}}$" for g in zg.index])
+
+    panel_letters(fig, [("a", ax_a), ("b", ax_b), ("c", ax_c), ("d", ax_d),
+                        ("e", ax_e), ("f", ax_f), ("g", ax_g)])
 
     fig.savefig(OUT / "figure1.pdf")
     fig.savefig(OUT / "figure1.png")
