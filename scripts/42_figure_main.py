@@ -349,8 +349,10 @@ def main() -> int:
     panel_letters(fig, [("a", ax_a), ("b", ax_b), ("c", ax_c), ("d", ax_d),
                         ("e", ax_e), ("f", ax_f), ("g", ax_g)])
 
-    fig.savefig(OUT / "figure1.pdf")
-    fig.savefig(OUT / "figure1.png")
+    # No creation timestamp: an unchanged figure should produce an unchanged
+    # file, so re-running the script does not show up as a diff.
+    fig.savefig(OUT / "figure1.pdf", metadata={"CreationDate": None})
+    fig.savefig(OUT / "figure1.png", metadata={"Software": None})
     plt.close(fig)
 
     print("whole-section bilateral balance (1.0 = symmetric):")
