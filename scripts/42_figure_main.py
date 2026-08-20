@@ -68,7 +68,7 @@ sys.path.insert(0, str(REPO / "src"))
 
 from spatial_lea.figstyle import (  # noqa: E402
     ADULT, AGED as C_AGED, FULL, GALR1, INK, NUCLEUS_COLOUR, NUCLEUS_LABEL, POP,
-    TISSUE, bare, panel_letters, scalebar, use_style, wash,
+    TISSUE, bare, panel_letters, scalebar, use_style,
 )
 from spatial_lea.io import (  # noqa: E402
     ADULT as A_ADULT, AGED as A_AGED, BLOCKS, ONE_PER_MOUSE, counts_matrix,
@@ -182,14 +182,20 @@ def animal_heatmap(fig, ax, z: pd.DataFrame, cbar_label: str, ylabels,
     cb.outline.set_visible(False)
 
 
-def frame_panel(ax, ml, dv, nuc, present, pale: bool):
-    """The shared anatomical frame.  ``pale`` washes the subregions towards
-    white, which keeps the anatomy readable under cells plotted on top."""
+def frame_panel(ax, ml, dv, nuc, present, subregions: bool):
+    """The shared anatomical frame, with or without the subregion colours.
+
+    A single section carries its own anatomy -- the ventricle, the tissue
+    outline -- so it does not need the colours to be readable, and grey leaves
+    the panel to the cells drawn on it.
+    """
     ax.scatter(ml, dv, s=.45, c=TISSUE, linewidths=0, rasterized=True)
-    for key in sorted(present, key=lambda k: int((nuc == k).sum()), reverse=True):
-        m = nuc == key
-        colour = [wash(NUCLEUS_COLOUR[key])] if pale else NUCLEUS_COLOUR[key]
-        ax.scatter(ml[m], dv[m], s=.45, c=colour, linewidths=0, rasterized=True)
+    if subregions:
+        for key in sorted(present, key=lambda k: int((nuc == k).sum()),
+                          reverse=True):
+            m = nuc == key
+            ax.scatter(ml[m], dv[m], s=.45, c=NUCLEUS_COLOUR[key], linewidths=0,
+                       rasterized=True)
     ax.set_xlim(-1500, 1500); ax.set_ylim(-100, 1800)
     ax.set_aspect("equal"); bare(ax)
     scalebar(ax, 500, "500 µm")
@@ -252,7 +258,7 @@ def main() -> int:
 
     # (a) what was analysed
     ax_a = ax = fig.add_subplot(row1[0])
-    frame_panel(ax, ml, dv, nuc, present, pale=False)
+    frame_panel(ax, ml, dv, nuc, present, subregions=True)
     for key in present:
         m = nuc == key
         side = ml[m] > 0 if (ml[m] > 0).sum() > 30 else ml[m] < 0
@@ -268,7 +274,7 @@ def main() -> int:
     # (b) where the cell type that changes sits
     ax_b = ax = fig.add_subplot(row1[1])
     on = sections == rep
-    frame_panel(ax, ml[on], dv[on], nuc[on], present, pale=True)
+    frame_panel(ax, ml[on], dv[on], nuc[on], present, subregions=False)
     ax.scatter(ml[is_pop], dv[is_pop], s=4.2, c=POP, linewidths=.2,
                edgecolors="white", rasterized=True)
     ax.annotate(POPNAME, xy=(0, -0.02), xycoords="axes fraction", fontsize=5.6,
