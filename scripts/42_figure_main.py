@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
-"""Main figure: dorsal hypothalamic Prdm8/Cbln1 neurons in ageing.
+"""Main figure: Galr1 upregulation in dorsal hypothalamic Ghrh neurons with age.
 
 Single biological conclusion the figure supports:
 
-    A defined glutamatergic population of the dorsal hypothalamus loses activity
-    with age while upregulating Galr1, without any loss of neurons.
+    A defined glutamatergic population of the dorsal hypothalamus -- Galr1+,
+    Ghrh+, Ghsr+, Galr3+ -- upregulates Galr1 with age, without loss of neurons.
 
-Panels, in narrative order:
-  a  where the neurons are, at three magnifications of the same tissue
-  b  what they are -- marker enrichment establishes identity
-  c  Fos falls          } the observation, one point per animal,
-  d  Galr1 rises        } paired within block, all four blocks shown
-  e  Ghsr rises         }
-  f  abundance is unchanged, so this is regulation and not cell loss
-  g  reproducibility -- the within-block fold change for every gene that
-     separates the groups completely
+Panels:
+  a  where the neurons are: one intact section, then every neuron of this type
+     from all eight animals in the shared anatomical frame
+  b  what they are, with the four genes that define them for this study
+  c  Galr1 rises      } one point per animal, adult and aged joined within block
+  d  Ghsr rises       }
+  e  abundance is unchanged, so this is regulation and not cell loss
+  f  every gene that separates the groups completely, for context
 
 Choices made by rule rather than by eye:
-  * representative section = the one of the eight whose neuron count is nearest
-    the median, ties broken by anatomical frame quality
-  * representative field = the 250 um square in that section containing the most
-    neurons of this population
-Both are stated in the caption text printed by this script.
+  * representative section = the section with the highest whole-section bilateral
+    balance, i.e. the most intact tissue.  Balance is the ratio of cells left
+    and right of the midline; a torn or folded section scores low.  Restricting
+    that test to the analysed window is not enough -- a section can be perfectly
+    symmetric inside the window and badly damaged outside it.
 
-Statistics are computed within blocks throughout; each block is one aged and one
-adult mouse processed on the same slide run, gene panel and segmentation
-chemistry, so no comparison crosses a technical boundary.
+Adult is plotted first throughout, as the reference condition.  Fos falls
+steeply in these neurons in aged mice, but these animals are untreated, so
+immediate-early gene expression is hard to interpret without a stimulus; it is
+reported in Extended Data rather than as a main-figure claim.
 """
 
 from __future__ import annotations
@@ -41,42 +41,46 @@ import scanpy as sc
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.patches import Rectangle  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 from spatial_lea.figstyle import (  # noqa: E402
-    ADULT, AGED as C_AGED, FULL, INK, MUTED, OTHER_CELLS, POP, TISSUE,
-    bare, panel, scalebar, use_style,
+    ADULT, AGED as C_AGED, FULL, INK, MUTED, POP, TISSUE, bare, panel,
+    scalebar, use_style,
 )
 from spatial_lea.io import (  # noqa: E402
-    ADULT as A_ADULT, AGED as A_AGED, ANIMAL_META, BLOCKS, ONE_PER_MOUSE,
-    counts_matrix,
+    ADULT as A_ADULT, AGED as A_AGED, BLOCKS, ONE_PER_MOUSE, counts_matrix,
 )
 
 PROC = REPO / "data" / "processed"
 OUT = REPO / "results" / "figures"
 SRC = OUT / "source_data"
 POPNAME = "Glut Prdm8/Cbln1"
-ANIMALS = list(A_AGED) + list(A_ADULT)
-GENES = ["Fos", "Galr1", "Ghsr"]
-FIELD_UM = 250.0
-MARKERS = 10
+# Adult first: the reference condition.
+ANIMALS = list(A_ADULT) + list(A_AGED)
+# Priority order for this study; Galr1 leads, then the peptide that names the
+# population, then the other two receptors it carries.
+KEY_GENES = ["Galr1", "Ghrh", "Ghsr", "Galr3"]
+MAIN_GENES = ["Galr1", "Ghsr"]
+CONTEXT_MARKERS = 8
 
 
 def blocked_stats(cpm: pd.DataFrame) -> pd.DataFrame:
     lfc = pd.DataFrame({b: cpm.loc[x] - cpm.loc[y] for b, (x, y) in BLOCKS.items()}).T
     mean = lfc.mean()
     agree = (np.sign(lfc) == np.sign(mean)).sum()
-    vals = cpm.to_numpy(); idx = list(range(len(ANIMALS)))
-    obs = vals[:4].mean(axis=0) - vals[4:].mean(axis=0)
+    vals = cpm.loc[ANIMALS].to_numpy()
+    n_ad = len(A_ADULT)
+    idx = list(range(len(ANIMALS)))
+    obs = vals[n_ad:].mean(axis=0) - vals[:n_ad].mean(axis=0)
     null = np.array([vals[list(c)].mean(axis=0)
                      - vals[[i for i in idx if i not in c]].mean(axis=0)
-                     for c in combinations(idx, 4)])
+                     for c in combinations(idx, n_ad)])
     p = (np.abs(null) >= np.abs(obs)).mean(axis=0)
-    margin = np.maximum(vals[:4].min(axis=0) - vals[4:].max(axis=0),
-                        vals[4:].min(axis=0) - vals[:4].max(axis=0))
+    aged_v, adult_v = vals[n_ad:], vals[:n_ad]
+    margin = np.maximum(aged_v.min(axis=0) - adult_v.max(axis=0),
+                        adult_v.min(axis=0) - aged_v.max(axis=0))
     out = pd.DataFrame({"lfc": mean, "blocks": agree, "p": p, "margin": margin})
     for b in BLOCKS:
         out[f"lfc_{b}"] = lfc.loc[b]
@@ -84,19 +88,18 @@ def blocked_stats(cpm: pd.DataFrame) -> pd.DataFrame:
 
 
 def paired_panel(ax, values: dict, ylabel: str, title: str) -> None:
-    """One point per animal, aged and adult joined within block."""
+    """One point per animal; adult on the left, joined to its block partner."""
     for a_aged, a_adult in BLOCKS.values():
-        ax.plot([0, 1], [values[a_aged], values[a_adult]], color="#C9C9C9",
+        ax.plot([0, 1], [values[a_adult], values[a_aged]], color="#C9C9C9",
                 lw=.6, zorder=1)
-    for j, (grp, members, colour) in enumerate(
-            (("aged", A_AGED, C_AGED), ("adult", A_ADULT, ADULT))):
+    for j, (members, colour) in enumerate(((A_ADULT, ADULT), (A_AGED, C_AGED))):
         ys = [values[a] for a in members]
         ax.scatter([j] * len(ys), ys, s=13, color=colour, zorder=3,
                    linewidths=0, clip_on=False)
         ax.plot([j - .22, j + .22], [np.mean(ys)] * 2, color=colour, lw=1.3,
                 solid_capstyle="butt", zorder=2)
     ax.set_xlim(-.45, 1.45); ax.set_xticks([0, 1])
-    ax.set_xticklabels(["aged", "adult"])
+    ax.set_xticklabels(["adult", "aged"])
     ax.set_ylabel(ylabel)
     ax.set_title(title, loc="left", pad=3)
 
@@ -110,154 +113,132 @@ def main() -> int:
     is_pop = (win.obs["cell_type"].astype(str) == POPNAME).to_numpy()
     animals = win.obs["animal"].astype(str).to_numpy()
     sections = win.obs["section"].astype(str).to_numpy()
+    ml, dv = win.obs["ml"].to_numpy(), win.obs["dv"].to_numpy()
     counts = counts_matrix(win)
     var = win.var_names.to_numpy()
 
-    # --- statistics -------------------------------------------------------
     mat = pd.DataFrame({a: counts[is_pop & (animals == a)].sum(axis=0)
                         for a in ANIMALS}, index=var).T
     expressed = mat.sum(axis=0) >= 200
     cpm = np.log2(mat.div(mat.sum(axis=1), axis=0) * 1e6 + 1)
     stats = blocked_stats(cpm)[expressed]
     stats.to_csv(SRC / "fig_main_stats.csv")
+    # Fos is reported in Extended Data, so its per-animal values travel too.
+    cpm.loc[ANIMALS, [g for g in ("Fos",) if g in cpm.columns]].to_csv(
+        SRC / "fig_main_fos_per_animal.csv")
 
-    # --- representative section and field, by rule ------------------------
-    per_sec = pd.Series({s: int((is_pop & (sections == s)).sum())
-                         for s in ONE_PER_MOUSE})
-    qc = pd.read_csv(REPO / "results" / "anatomy" / "frame_qc.csv", index_col=0)
-    cand = (per_sec - per_sec.median()).abs()
-    best = cand[cand == cand.min()].index
-    rep = max(best, key=lambda s: qc.loc[s, "quality"])
-    rep_pop = is_pop & (sections == rep)
-    ml, dv = win.obs["ml"].to_numpy(), win.obs["dv"].to_numpy()
-
-    px, py = ml[rep_pop], dv[rep_pop]
-    grid = [(x, y, int(((px >= x) & (px < x + FIELD_UM)
-                        & (py >= y) & (py < y + FIELD_UM)).sum()))
-            for x in np.arange(px.min() - 20, px.max(), 25)
-            for y in np.arange(py.min() - 20, py.max(), 25)]
-    fx, fy, fn = max(grid, key=lambda t: t[2])
-    field = (fx, fy, fx + FIELD_UM, fy + FIELD_UM)
-
-    # --- figure -----------------------------------------------------------
-    fig = plt.figure(figsize=(FULL, 5.55))
-    gs = fig.add_gridspec(3, 3, height_ratios=[.90, .90, .90],
-                          width_ratios=[1.22, 1, 1], hspace=.52, wspace=.52)
-
-    # (a) three magnifications of the same tissue
-    gsa = gs[0, :].subgridspec(1, 3, width_ratios=[1.35, 1.15, 1], wspace=.14)
-
+    # --- representative section: the most intact tissue, whole section --------
     whole = sc.read_h5ad(PROC / "mbh_anatomical.h5ad", backed="r")
-    ws = whole.obs["section"].astype(str).to_numpy() == rep
-    wml = whole.obs["ml"].to_numpy()[ws]
-    wdv = whole.obs["dv"].to_numpy()[ws]
+    wsec = whole.obs["section"].astype(str).to_numpy()
+    wml = whole.obs["ml"].to_numpy()
+    balance = {}
+    for s in ONE_PER_MOUSE:
+        x = wml[wsec == s]
+        left, right = (x < -200).sum(), (x > 200).sum()
+        balance[s] = min(left, right) / max(left, right)
+    rep = max(balance, key=balance.get)
     whole.file.close()
 
-    ax = fig.add_subplot(gsa[0]); panel(ax, "a", dx=-0.03, dy=1.16)
-    sub = np.random.default_rng(0).choice(len(wml), min(55000, len(wml)), replace=False)
-    ax.scatter(wml[sub], wdv[sub], s=.25, c=TISSUE, linewidths=0, rasterized=True)
-    ax.add_patch(Rectangle((-1500, -100), 3000, 1900, fill=False, ec=INK, lw=.6))
-    ax.set_aspect("equal"); bare(ax)
-    ax.set_xlim(np.percentile(wml, .2), np.percentile(wml, 99.8))
-    ax.set_ylim(np.percentile(wdv, .2), np.percentile(wdv, 99.8))
-    scalebar(ax, 1000, "1 mm")
-    ax.set_title(f"{rep}, coronal", loc="left", pad=2, color=MUTED, x=.06)
+    fig = plt.figure(figsize=(FULL, 4.35))
+    outer = fig.add_gridspec(2, 1, height_ratios=[.98, 1.0], hspace=.44)
+    top = outer[0].subgridspec(1, 3, width_ratios=[1.05, 1.05, 1.05], wspace=.42)
+    bot = outer[1].subgridspec(1, 4, width_ratios=[1, 1, 1, 1.05], wspace=.60)
 
-    ax = fig.add_subplot(gsa[1])
-    inwin = (sections == rep)
-    ax.scatter(ml[inwin & ~is_pop], dv[inwin & ~is_pop], s=.7, c=TISSUE,
-               linewidths=0, rasterized=True)
-    ax.scatter(ml[rep_pop], dv[rep_pop], s=4.5, c=POP, linewidths=0, rasterized=True)
-    ax.add_patch(Rectangle((field[0], field[1]), FIELD_UM, FIELD_UM,
-                           fill=False, ec=INK, lw=.6))
+    # (a) one intact section, then the whole population from every animal
+    ax = fig.add_subplot(top[0]); panel(ax, "a", dx=-0.06, dy=1.16)
+    m = sections == rep
+    ax.scatter(ml[m & ~is_pop], dv[m & ~is_pop], s=.8, c=TISSUE, linewidths=0,
+               rasterized=True)
+    ax.scatter(ml[m & is_pop], dv[m & is_pop], s=5.5, c=POP, linewidths=0,
+               rasterized=True)
     ax.set_xlim(-1500, 1500); ax.set_ylim(-100, 1800)
     ax.set_aspect("equal"); bare(ax)
     scalebar(ax, 500, "500 µm")
-    ax.set_title("hypothalamic window", loc="left", pad=2, color=MUTED)
-    # Direct labels rather than a legend; each is in the colour of the mark it
-    # names, so nothing has to be matched up by eye.
-    ax.annotate("Prdm8/Cbln1 neurons", xy=(-1460, 1690), fontsize=5.5,
+    ax.annotate("Galr1$^+$ Ghrh$^+$ neurons", xy=(-1460, 1740), fontsize=5.5,
                 color=POP, va="top", ha="left")
-    ax.annotate("all other cells", xy=(-1460, 1530), fontsize=5.5,
+    ax.annotate("all other cells", xy=(-1460, 1580), fontsize=5.5,
                 color="#A8A8A8", va="top", ha="left")
+    ax.set_title("one section", loc="left", pad=2, color=MUTED)
 
-    ax = fig.add_subplot(gsa[2])
-    m = inwin & (ml >= field[0]) & (ml < field[2]) & (dv >= field[1]) & (dv < field[3])
-    ax.scatter(ml[m & ~is_pop], dv[m & ~is_pop], s=9, c=OTHER_CELLS,
-               linewidths=0, rasterized=True)
-    ax.scatter(ml[m & is_pop], dv[m & is_pop], s=16, c=POP, linewidths=0,
-               rasterized=True)
-    ax.set_xlim(field[0], field[2]); ax.set_ylim(field[1], field[3])
+    ax = fig.add_subplot(top[1])
+    keep = np.random.default_rng(0).choice(np.where(~is_pop)[0],
+                                           min(45000, (~is_pop).sum()), replace=False)
+    ax.scatter(ml[keep], dv[keep], s=.4, c=TISSUE, linewidths=0, rasterized=True)
+    ax.scatter(ml[is_pop], dv[is_pop], s=3.2, c=POP, linewidths=0, rasterized=True)
+    ax.set_xlim(-1500, 1500); ax.set_ylim(-100, 1800)
     ax.set_aspect("equal"); bare(ax)
-    scalebar(ax, 50, "50 µm")
-    ax.set_title(f"{fn} of these neurons in field", loc="left", pad=2, color=MUTED)
+    scalebar(ax, 500, "500 µm")
+    ax.set_title(f"all {int(is_pop.sum())} neurons, 8 animals", loc="left",
+                 pad=2, color=MUTED)
 
     # (b) identity
-    ax = fig.add_subplot(gs[1, 0]); panel(ax, "b")
+    ax = fig.add_subplot(top[2]); panel(ax, "b", dx=-0.40)
     cin = counts[is_pop].sum(axis=0) / counts[is_pop].sum() * 1e6
     cout = counts[~is_pop].sum(axis=0) / counts[~is_pop].sum() * 1e6
-    enr = pd.Series(np.log2((cin + 1) / (cout + 1)), index=var).nlargest(MARKERS)
-    enr = enr.sort_values()
-    receptors = {"Galr1", "Galr3", "Ghsr"}
-    ax.barh(range(len(enr)), enr.values, height=.68,
-            color=[POP if g in receptors else "#9A9A9A" for g in enr.index])
-    ax.set_yticks(range(len(enr)))
-    ax.set_yticklabels([f"$\\it{{{g}}}$" for g in enr.index])
-    ax.set_xlabel("log$_2$ enrichment over other cells")
+    enr = pd.Series(np.log2((cin + 1) / (cout + 1)), index=var)
+    context = [g for g in enr.nlargest(CONTEXT_MARKERS + len(KEY_GENES)).index
+               if g not in KEY_GENES][:CONTEXT_MARKERS]
+    order = context[::-1] + KEY_GENES[::-1]     # key genes on top, Galr1 highest
+    vals = enr[order]
+    ax.barh(range(len(order)), vals.values, height=.68,
+            color=[POP if g in KEY_GENES else "#C4C4C4" for g in order])
+    ax.set_yticks(range(len(order)))
+    ax.set_yticklabels([f"$\\it{{{g}}}$" for g in order],
+                       fontweight="normal")
+    for tick, g in zip(ax.get_yticklabels(), order):
+        tick.set_color(INK if g in KEY_GENES else MUTED)
     ax.tick_params(axis="y", length=0)
+    ax.set_xlabel("log$_2$ enrichment over other cells")
 
-    # (c-e) the observation
-    for j, gene in enumerate(GENES):
-        ax = fig.add_subplot(gs[1, j + 1] if j < 2 else gs[2, 0])
-        panel(ax, "cde"[j])
+    # (c, d) the observation
+    for j, gene in enumerate(MAIN_GENES):
+        ax = fig.add_subplot(bot[j]); panel(ax, "cd"[j], dx=-0.46)
         r = stats.loc[gene]
         paired_panel(ax, cpm[gene].to_dict(), f"$\\it{{{gene}}}$ (log$_2$ CPM)",
-                     f"{2 ** r.lfc:.2f}×   $P$ = {r.p:.3f}")
+                     f"{2 ** r.lfc:.2f}×  $P$ = {r.p:.3f}")
 
-    # (f) abundance
-    ax = fig.add_subplot(gs[2, 1]); panel(ax, "f")
+    # (e) abundance
+    ax = fig.add_subplot(bot[2]); panel(ax, "e", dx=-0.46)
     pct = {a: (is_pop & (animals == a)).sum() / (animals == a).sum() * 100
            for a in ANIMALS}
     ab = blocked_stats(pd.DataFrame({"abundance": pct}).loc[ANIMALS])
     paired_panel(ax, pct, "abundance (% of cells)",
-                 f"no change   $P$ = {ab.loc['abundance', 'p']:.2f}")
+                 f"no change  $P$ = {ab.loc['abundance', 'p']:.2f}")
 
-    # (g) reproducibility: every gene that separates the groups completely,
-    # ranked. All are plotted; only the four that carry the argument are named,
-    # so no gene is selected out of the display.
-    ax = fig.add_subplot(gs[2, 2]); panel(ax, "g")
+    # (f) every gene that separates the groups completely
+    ax = fig.add_subplot(bot[3]); panel(ax, "f", dx=-0.34)
     sep = stats[(stats.blocks == 4) & (stats.margin > 0)]
     sep = sep.reindex(sep.lfc.sort_values().index)
     ys = np.arange(len(sep))
     for b in BLOCKS:
-        ax.scatter(sep[f"lfc_{b}"], ys, s=5, facecolors="none",
-                   edgecolors="#B0B0B0", linewidths=.4, zorder=2)
-    ax.scatter(sep["lfc"], ys, s=11, color=INK, zorder=3, linewidths=0)
+        ax.scatter(sep[f"lfc_{b}"], ys, s=4, facecolors="none",
+                   edgecolors="#B8B8B8", linewidths=.4, zorder=2)
+    ax.scatter(sep["lfc"], ys, s=9, color=INK, zorder=3, linewidths=0)
     ax.axvline(0, color=MUTED, lw=.5)
     ax.set_yticks([]); ax.set_ylim(-1.2, len(sep) + .4)
-    ax.set_xlim(-3.6, 1.6)
     ax.set_xlabel("aged / adult (log$_2$)")
     ax.set_ylabel(f"{len(sep)} genes, ranked")
-    for g, ha, dx in (("Fos", "left", .24), ("Tacr1", "left", .24),
-                      ("Galr1", "right", -.20), ("Ghsr", "right", -.20)):
+    for g, dy in zip(MAIN_GENES, (6, -6)):
         if g in sep.index:
             y = int(np.where(sep.index == g)[0][0])
-            ax.annotate(f"$\\it{{{g}}}$", (sep.lfc[g], y), xytext=(dx * 30, 0),
+            ax.annotate(f"$\\it{{{g}}}$", (sep.lfc[g], y), xytext=(7, dy),
                         textcoords="offset points", fontsize=5.5, va="center",
-                        ha=ha, color=INK)
+                        ha="left", color=INK)
+    ax.set_xlim(sep[[f"lfc_{b}" for b in BLOCKS]].min().min() - .4,
+                sep[[f"lfc_{b}" for b in BLOCKS]].max().max() + 1.3)
 
     fig.savefig(OUT / "figure_main.pdf")
     fig.savefig(OUT / "figure_main.png")
     plt.close(fig)
 
-    print(f"Representative section: {rep} "
-          f"(neurons {per_sec[rep]}, median {per_sec.median():.1f}; "
-          f"frame quality {qc.loc[rep, 'quality']})")
-    print(f"Representative field: {FIELD_UM:.0f} um square at "
-          f"ml {field[0]:.0f}..{field[2]:.0f}, dv {field[1]:.0f}..{field[3]:.0f}, "
-          f"containing {fn} neurons (the densest such square in that section)")
-    print(f"Genes separating completely in all four blocks: {len(sep)}")
-    print(sep[["lfc", "p", "margin"]].round(3).to_string())
+    print("whole-section bilateral balance (1.0 = symmetric):")
+    for s, v in sorted(balance.items(), key=lambda kv: -kv[1]):
+        print(f"   {s:8s} {v:.3f}{'   <- shown' if s == rep else ''}")
+    print(f"\n{int(is_pop.sum())} neurons across 8 animals")
+    for g in KEY_GENES:
+        if g in stats.index:
+            r = stats.loc[g]
+            print(f"  {g:6s} {2 ** r.lfc:.2f}x  blocks {int(r.blocks)}/4  P {r.p:.4f}")
     print(f"\nwrote {OUT / 'figure_main.pdf'} (+ .png)")
     return 0
 

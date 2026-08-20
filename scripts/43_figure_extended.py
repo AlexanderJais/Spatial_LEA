@@ -11,6 +11,10 @@ reviewer would reasonably raise about the main figure.
   e  how often the significance criterion fires across the whole panel
   f  the conclusion is unchanged when segmentation is re-derived from raw
      transcripts rather than taken from the vendor
+  g  Fos in these neurons.  It falls steeply with age and does so in every
+     block, but these animals are untreated, so immediate-early gene expression
+     has no stimulus to be read against.  It is reported here rather than in the
+     main figure for that reason, not because the measurement is weak.
 """
 
 from __future__ import annotations
@@ -33,7 +37,8 @@ from spatial_lea.figstyle import (  # noqa: E402
     ADULT, AGED as C_AGED, FULL, INK, MUTED, POP, panel, use_style,
 )
 from spatial_lea.io import (  # noqa: E402
-    ANIMAL_META, BLOCKS, ONE_PER_MOUSE, RAW, SECTION_ANIMAL,
+    ADULT as A_ADULT, AGED as A_AGED, ANIMAL_META, BLOCKS, ONE_PER_MOUSE, RAW,
+    SECTION_ANIMAL,
 )
 
 OUT = REPO / "results" / "figures"
@@ -52,26 +57,25 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True); SRC.mkdir(parents=True, exist_ok=True)
 
     fig = plt.figure(figsize=(FULL, 4.9))
-    gs = fig.add_gridspec(2, 3, height_ratios=[1, 1], hspace=.75, wspace=.48)
+    gs = fig.add_gridspec(2, 4, height_ratios=[1, 1], hspace=.95, wspace=.95)
 
     # (a) design
     ax = fig.add_subplot(gs[0, 0]); panel(ax, "a")
     for i, (b, (a_aged, a_adult)) in enumerate(BLOCKS.items()):
         y = len(BLOCKS) - 1 - i
         ax.plot([0, 1], [y, y], color="#D0D0D0", lw=.6, zorder=1)
-        ax.scatter([0], [y], s=22, color=C_AGED, zorder=3, linewidths=0)
-        ax.scatter([1], [y], s=22, color=ADULT, zorder=3, linewidths=0)
+        ax.scatter([0], [y], s=22, color=ADULT, zorder=3, linewidths=0)
+        ax.scatter([1], [y], s=22, color=C_AGED, zorder=3, linewidths=0)
         # Names sit beside their own marker, not above the row, so a label can
         # never be read as belonging to the block below it.
-        ax.text(-0.10, y, f"{b}   {a_aged}, {ANIMAL_META[a_aged]['age_weeks']} wk",
+        ax.text(-0.10, y, f"{b}   {a_adult}, {ANIMAL_META[a_adult]['age_weeks']} wk",
                 ha="right", va="center", fontsize=5, color=INK)
-        ax.text(1.10, y, f"{a_adult}, {ANIMAL_META[a_adult]['age_weeks']} wk",
+        ax.text(1.10, y, f"{a_aged}, {ANIMAL_META[a_aged]['age_weeks']} wk",
                 ha="left", va="center", fontsize=5, color=INK)
     ax.set_xlim(-1.25, 2.05); ax.set_ylim(-.5, len(BLOCKS) - .5)
-    ax.set_xticks([0, 1]); ax.set_xticklabels(["aged", "adult"])
+    ax.set_xticks([0, 1]); ax.set_xticklabels(["adult", "aged"])
     ax.set_yticks([]); ax.spines["left"].set_visible(False)
-    ax.set_title("one aged and one adult mouse per block,\n"
-                 "matched for slide run, panel and chemistry",
+    ax.set_title("blocks matched for slide run,\npanel and chemistry",
                  loc="left", pad=4, color=MUTED, fontsize=5.8)
 
     # (b) panel overlap
@@ -94,7 +98,7 @@ def main() -> int:
     ax.annotate("cohort-specific", xy=(shared + 14, .5), ha="left", va="center",
                 fontsize=5, color=MUTED)
     ax.set_xlim(0, shared + 100); ax.set_ylim(-.55, 1.75)
-    ax.set_title("analysis uses the shared set only", loc="left", pad=4,
+    ax.set_title("shared set only\nis analysed", loc="left", pad=4,
                  color=MUTED, fontsize=5.8)
 
     # (c) registration QC
@@ -112,7 +116,7 @@ def main() -> int:
     ax.set_ylim(0, 105); ax.set_xticks([])
     ax.set_xlabel(f"{len(qc)} sections")
     ax.set_ylabel("ARC anchors inside\nfitted window (%)")
-    ax.set_title("filled, sections analysed", loc="left", pad=4, color=MUTED,
+    ax.set_title("filled, sections\nanalysed", loc="left", pad=4, color=MUTED,
                  fontsize=5.8)
 
     # (d) section-choice sensitivity
@@ -128,23 +132,24 @@ def main() -> int:
     ax.axvline(0, color=MUTED, lw=.5)
     ax.set_xlabel("$\\it{Galr1}$ aged / adult (log$_2$)")
     ax.set_ylabel(f"section sets ({len(sens)})")
-    ax.set_title(f"positive in {int((sens.mean_lfc > 0).sum())} of {len(sens)} "
-                 "possible\nsection choices", loc="left", pad=4, color=MUTED,
+    ax.set_title(f"positive in {int((sens.mean_lfc > 0).sum())}/{len(sens)}\n"
+                 "possible section sets", loc="left", pad=4, color=MUTED,
                  fontsize=5.8)
 
     # (e) panel-wide calibration
     ax = fig.add_subplot(gs[1, 1]); panel(ax, "e")
     cal = pd.read_csv(REPO / "results" / "gal_n8" / "calibration_by_cell_type.csv")
-    bars = [("all four blocks\nagree", cal.pct_blocks_agree_4.mean(), 12.5),
-            ("groups separate\ncompletely", cal.pct_separating.mean(), 2.9),
-            ("both, with\neffect size", cal.pct_strict.mean(), 0.36)]
+    bars = [("blocks\nagree", cal.pct_blocks_agree_4.mean(), 12.5),
+            ("separate", cal.pct_separating.mean(), 2.9),
+            ("both", cal.pct_strict.mean(), 0.36)]
     xs = np.arange(len(bars))
     ax.bar(xs, [b[1] for b in bars], width=.5, color=GREY)
     for x, (_, obs, exp) in zip(xs, bars):
         ax.plot([x - .3, x + .3], [exp, exp], color=INK, lw=1.0)
     ax.set_xticks(xs); ax.set_xticklabels([b[0] for b in bars], fontsize=5.2)
+    ax.set_xlabel("criterion", labelpad=1)
     ax.set_ylabel("panel genes meeting\ncriterion (%)")
-    ax.set_title("bars, observed; rules, expected by chance", loc="left", pad=4,
+    ax.set_title("bars, observed\nrules, chance", loc="left", pad=4,
                  color=MUTED, fontsize=5.8)
 
     # (f) segmentation validation
@@ -162,8 +167,32 @@ def main() -> int:
     ax.annotate("re-segmented", xy=(w / 2, mm.baysor_matched.iloc[0] + .8),
                 ha="center", fontsize=5.2, color=INK)
     ax.set_ylim(0, mm.vendor.max() * 1.35)
-    ax.set_title("matched objects at matched depth", loc="left", pad=4,
+    ax.set_title("matched objects,\nmatched depth", loc="left", pad=4,
                  color=MUTED, fontsize=5.8)
+
+    # (g) Fos
+    ax = fig.add_subplot(gs[1, 3]); panel(ax, "g", dx=-0.46)
+    fos = pd.read_csv(SRC / "fig_main_stats.csv", index_col=0)
+    per_animal = pd.read_csv(SRC / "fig_main_fos_per_animal.csv", index_col=0) \
+        if (SRC / "fig_main_fos_per_animal.csv").exists() else None
+    if per_animal is not None:
+        vals = per_animal["Fos"].to_dict()
+        for a_aged, a_adult in BLOCKS.values():
+            ax.plot([0, 1], [vals[a_adult], vals[a_aged]], color="#C9C9C9",
+                    lw=.6, zorder=1)
+        for j, (members, colour) in enumerate(
+                ((list(A_ADULT), ADULT), (list(A_AGED), C_AGED))):
+            ys = [vals[a] for a in members]
+            ax.scatter([j] * len(ys), ys, s=13, color=colour, zorder=3,
+                       linewidths=0, clip_on=False)
+            ax.plot([j - .22, j + .22], [np.mean(ys)] * 2, color=colour, lw=1.3,
+                    solid_capstyle="butt", zorder=2)
+        ax.set_xlim(-.45, 1.45); ax.set_xticks([0, 1])
+        ax.set_xticklabels(["adult", "aged"])
+        ax.set_ylabel("$\\it{Fos}$ (log$_2$ CPM)")
+        r = fos.loc["Fos"]
+        ax.set_title(f"{2 ** r.lfc:.2f}×  $P$ = {r.p:.3f}\nuntreated animals",
+                     loc="left", pad=3, color=MUTED, fontsize=5.8)
 
     fig.savefig(OUT / "figure_extended_data.pdf")
     fig.savefig(OUT / "figure_extended_data.png")
