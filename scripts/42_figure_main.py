@@ -10,7 +10,8 @@
 Panels:
   a  the delineated subregions, every cell from all eight animals pooled in the
      shared anatomical frame, with what was analysed
-  b  where the cell type that changes sits, in the same frame
+  b  the same cells on one section -- the most intact one in the study -- with
+     every cell of this type from all eight animals registered onto it
   c  Galr1 per animal, z-scored across the eight, adult block then aged block,
      for every cell type the design can test.  Ordered by the age test, so what
      changes is at the top
@@ -30,6 +31,11 @@ Choices made by rule rather than by eye:
   * "changes" means all four blocks agreeing in sign, aged and adult ranges not
     overlapping, and a permutation P <= 0.05.  0.0286 is the smallest P eight
     animals can produce, so this is the strictest the design allows.
+  * the section shown in panel b is the one with the highest whole-section
+    bilateral balance, i.e. the most intact tissue: the ratio of cells left and
+    right of the midline, which a torn or folded section fails.  Measured on the
+    whole section rather than inside the analysed window, since a section can be
+    symmetric in the window and damaged outside it.
   * panel a paints the subregions largest first.  Pooled over eight sections,
     cells share pixels and whichever region is drawn last takes them; in the
     order the colour table lists them the DMH was painted over by LHA, ZI and
@@ -206,6 +212,19 @@ def main() -> int:
     counts = counts_matrix(win)
     var = win.var_names.to_numpy()
 
+    # The most intact section, by whole-section bilateral balance.
+    whole = sc.read_h5ad(PROC / "mbh_anatomical.h5ad", backed="r")
+    wsec = whole.obs["section"].astype(str).to_numpy()
+    wml = whole.obs["ml"].to_numpy()
+    balance = {}
+    for sec in ONE_PER_MOUSE:
+        x = wml[wsec == sec]
+        left, right = (x < -200).sum(), (x > 200).sum()
+        balance[sec] = min(left, right) / max(left, right)
+    rep = max(balance, key=balance.get)
+    whole.file.close()
+    sections = win.obs["section"].astype(str).to_numpy()
+
     screen, per_animal, excluded = galr1_screen(counts, var, cell_types, animals)
     screen.to_csv(SRC / "galr1_by_celltype.csv", index=False)
     per_animal.to_csv(SRC / "galr1_by_celltype_per_animal.csv")
@@ -227,7 +246,7 @@ def main() -> int:
     fig = plt.figure(figsize=(FULL, 7.9))
     outer = fig.add_gridspec(3, 1, height_ratios=[1.0, 1.12, 1.30], hspace=.40)
     row1 = outer[0].subgridspec(1, 2, wspace=.10)
-    row2 = outer[1].subgridspec(1, 2, width_ratios=[2.45, 1.0], wspace=.50)
+    row2 = outer[1].subgridspec(1, 2, width_ratios=[1.75, 1.0], wspace=.55)
     row3 = outer[2].subgridspec(1, 3, width_ratios=[1.0, 1.25, 1.30], wspace=.72)
     present = [k for k in NUCLEUS_LABEL if (nuc == k).any()]
 
@@ -248,7 +267,8 @@ def main() -> int:
 
     # (b) where the cell type that changes sits
     ax_b = ax = fig.add_subplot(row1[1])
-    frame_panel(ax, ml, dv, nuc, present, pale=True)
+    on = sections == rep
+    frame_panel(ax, ml[on], dv[on], nuc[on], present, pale=True)
     ax.scatter(ml[is_pop], dv[is_pop], s=4.2, c=POP, linewidths=.2,
                edgecolors="white", rasterized=True)
     ax.annotate(POPNAME, xy=(0, -0.02), xycoords="axes fraction", fontsize=5.6,
@@ -327,7 +347,13 @@ def main() -> int:
     fig.savefig(OUT / "figure1.png")
     plt.close(fig)
 
-    print(f"{win.n_obs:,} cells, {len(ANIMALS)} mice, 1 section each")
+    print("whole-section bilateral balance (1.0 = symmetric):")
+    for sec, v in sorted(balance.items(), key=lambda kv: -kv[1]):
+        print(f"   {sec:8s} {v:.3f}{'   <- shown in b' if sec == rep else ''}")
+    print(f"\npanel b: {int((sections == rep).sum()):,} cells of section {rep} as "
+          f"the field, with all {int(is_pop.sum()):,} {POPNAME} cells from the "
+          "eight animals registered onto it")
+    print(f"\n{win.n_obs:,} cells, {len(ANIMALS)} mice, 1 section each")
     print(f"{int(is_pop.sum()):,} {POPNAME} cells\n")
     print(f"Galr1 screen: {len(screen)} cell types tested "
           f"(>= {MIN_CELLS_PER_ANIMAL} cells in every animal, "
