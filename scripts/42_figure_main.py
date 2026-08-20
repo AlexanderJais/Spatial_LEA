@@ -62,7 +62,7 @@ sys.path.insert(0, str(REPO / "src"))
 
 from spatial_lea.figstyle import (  # noqa: E402
     ADULT, AGED as C_AGED, FULL, GALR1, INK, NUCLEUS_COLOUR, NUCLEUS_LABEL, POP,
-    TISSUE, bare, panel, scalebar, use_style, wash,
+    TISSUE, bare, panel, scalebar, use_style,
 )
 from spatial_lea.io import (  # noqa: E402
     ADULT as A_ADULT, AGED as A_AGED, BLOCKS, ONE_PER_MOUSE, counts_matrix,
@@ -74,6 +74,8 @@ SRC = OUT / "source_data"
 HYPOMAP = REPO / "results" / "hypomap" / "hypomap_C185_named_all_celltypes.csv"
 POPNAME = "Glut Prdm8/Cbln1"
 ANIMALS = list(A_ADULT) + list(A_AGED)
+# The manifest keys an animal "G_073"; the animal is G073.
+ANIMAL_LABEL = {a: a.replace("_", "") for a in ANIMALS}
 HYPOMAP_SHOWN = 6
 MIN_CELLS_PER_ANIMAL = 30
 MIN_PCT_POS = 10.0
@@ -153,7 +155,8 @@ def animal_heatmap(fig, ax, z: pd.DataFrame, cbar_label: str, ylabels,
                    norm=TwoSlopeNorm(vmin=-lim, vcenter=0, vmax=lim))
     ax.axvline(len(A_ADULT) - .5, color="white", lw=1.4)
     ax.set_xticks(range(len(ANIMALS)))
-    ax.set_xticklabels(ANIMALS, fontsize=4.8, rotation=90)
+    ax.set_xticklabels([ANIMAL_LABEL[a] for a in ANIMALS], fontsize=4.8,
+                       rotation=90)
     for x, label in ((len(A_ADULT) / 2 - .5, "adult"),
                      (len(A_ADULT) + len(A_AGED) / 2 - .5, "aged")):
         ax.annotate(label, xy=(x, -.8), fontsize=5.8, ha="center", va="bottom",
@@ -173,16 +176,15 @@ def animal_heatmap(fig, ax, z: pd.DataFrame, cbar_label: str, ylabels,
     cb.outline.set_visible(False)
 
 
-def frame_panel(ax, ml, dv, nuc, present):
-    """The shared anatomical frame, subregions as washes."""
-    for key in ("edge", "fibre", "TUseg"):
-        m = nuc == key
-        if m.any():
-            ax.scatter(ml[m], dv[m], s=.45, c=TISSUE, linewidths=0, rasterized=True)
-    for key in sorted(present, key=lambda k: int((nuc == k).sum()), reverse=True):
-        m = nuc == key
-        ax.scatter(ml[m], dv[m], s=.45, c=[wash(NUCLEUS_COLOUR[key])],
-                   linewidths=0, rasterized=True)
+def frame_panel(ax, ml, dv, nuc, present, coloured: bool):
+    """The shared anatomical frame; subregions coloured, or all tissue grey."""
+    ax.scatter(ml, dv, s=.45, c=TISSUE, linewidths=0, rasterized=True)
+    if coloured:
+        for key in sorted(present, key=lambda k: int((nuc == k).sum()),
+                          reverse=True):
+            m = nuc == key
+            ax.scatter(ml[m], dv[m], s=.45, c=NUCLEUS_COLOUR[key], linewidths=0,
+                       rasterized=True)
     ax.set_xlim(-1500, 1500); ax.set_ylim(-100, 1800)
     ax.set_aspect("equal"); bare(ax)
     scalebar(ax, 500, "500 µm")
@@ -223,14 +225,14 @@ def main() -> int:
 
     fig = plt.figure(figsize=(FULL, 5.7))
     outer = fig.add_gridspec(2, 1, height_ratios=[1.0, 1.0], hspace=.45)
-    top = outer[0].subgridspec(1, 3, width_ratios=[1.15, 1.15, 1.45], wspace=.50)
+    top = outer[0].subgridspec(1, 3, width_ratios=[1.15, 1.15, 1.40], wspace=.78)
     bot = outer[1].subgridspec(1, 4, width_ratios=[.62, 1.05, 1.15, 1.25],
                                wspace=.80)
     present = [k for k in NUCLEUS_LABEL if (nuc == k).any()]
 
     # (a) what was analysed
     ax = fig.add_subplot(top[0]); panel(ax, "a", dx=-0.04, dy=1.12)
-    frame_panel(ax, ml, dv, nuc, present)
+    frame_panel(ax, ml, dv, nuc, present, coloured=True)
     for key in present:
         m = nuc == key
         side = ml[m] > 0 if (ml[m] > 0).sum() > 30 else ml[m] < 0
@@ -240,22 +242,16 @@ def main() -> int:
                     fontweight="bold",
                     bbox=dict(boxstyle="round,pad=0.10", fc="white", ec="none",
                               alpha=.72))
-    ax.annotate(f"{win.n_obs:,} cells\n"
-                f"{len(ANIMALS)} mice: {len(A_ADULT)} adult, {len(A_AGED)} aged\n"
-                "1 section per mouse",
-                xy=(0, -0.02), xycoords="axes fraction", fontsize=5.6, color=INK,
-                ha="left", va="top", linespacing=1.5)
-    ax.set_title("delineated subregions", loc="left", pad=2, x=.04)
+    ax.annotate(f"{win.n_obs:,} cells", xy=(0, -0.02), xycoords="axes fraction",
+                fontsize=5.6, color=INK, ha="left", va="top")
 
     # (b) where the cell type that changes sits
     ax = fig.add_subplot(top[1]); panel(ax, "b", dx=-0.04, dy=1.12)
-    frame_panel(ax, ml, dv, nuc, present)
+    frame_panel(ax, ml, dv, nuc, present, coloured=False)
     ax.scatter(ml[is_pop], dv[is_pop], s=4.2, c=POP, linewidths=.2,
                edgecolors="white", rasterized=True)
-    ax.annotate(f"{POPNAME}\n{int(is_pop.sum()):,} cells",
-                xy=(0, -0.02), xycoords="axes fraction", fontsize=5.6, color=POP,
-                ha="left", va="top", fontweight="bold", linespacing=1.5)
-    ax.set_title("the cell type that changes", loc="left", pad=2, x=.04)
+    ax.annotate(POPNAME, xy=(0, -0.02), xycoords="axes fraction", fontsize=5.6,
+                color=POP, ha="left", va="top", fontweight="bold")
 
     # (c) Galr1 per animal, every testable cell type
     ax = fig.add_subplot(top[2]); panel(ax, "c", dx=-0.60, dy=1.12)
@@ -291,15 +287,11 @@ def main() -> int:
                rasterized=True)
     hmap = pd.read_csv(HYPOMAP, index_col=0)
     best = hmap[POPNAME].sort_values(ascending=False)
-    ax.annotate(best.index[0].split(": ", 1)[-1],
-                xy=(np.median(umap[pop_u, 0]), np.median(umap[pop_u, 1])),
+    ax.annotate(POPNAME, xy=(np.median(umap[pop_u, 0]), np.median(umap[pop_u, 1])),
                 xytext=(0, 14), textcoords="offset points", fontsize=5.6,
                 color=POP, fontweight="bold", ha="center", va="bottom")
-    ax.annotate(f"Xenium clustering, {ref.n_obs:,} cells",
-                xy=(.02, .99), xycoords="axes fraction", fontsize=5.2, color=INK,
-                ha="left", va="top")
     ax.set_aspect("equal"); bare(ax)
-    ax.set_title("HypoMap identity", loc="left", pad=2, x=.06)
+    ax.set_title("Xenium UMAP", loc="left", pad=2, x=.06)
     del ref
 
     # (f) how well that identity holds
