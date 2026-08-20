@@ -53,6 +53,38 @@ MARKERS = ["Cbln1", "Slc17a6", "Otp", "Prdm8", "Bdnf", "Galr1", "Ghsr",
            "Galr3", "Gal", "Ghrh"]
 
 
+def resolve_symbols(hm, panel: list[str]) -> pd.Index:
+    """Find where the gene symbols live and return them aligned to hm.var.
+
+    HypoMap distributions vary: the index may be symbols, Ensembl ids, or an
+    internal id, with symbols in a var column under any of several names.  Rather
+    than guess, every candidate is scored by how many panel genes it recovers and
+    the best is taken; a case-insensitive pass catches objects that upper-case
+    symbols.
+    """
+    want = {g.lower() for g in panel}
+    best, best_hits, best_where = None, 0, ""
+    candidates = [("var_names", pd.Index(hm.var_names.astype(str)))]
+    for col in hm.var.columns:
+        values = hm.var[col]
+        if values.dtype.name in ("category", "object"):
+            candidates.append((f"var['{col}']", pd.Index(values.astype(str))))
+    for where, values in candidates:
+        hits = sum(v.lower() in want for v in values)
+        if hits > best_hits:
+            best, best_hits, best_where = values, hits, where
+    if best is None or best_hits == 0:
+        preview = ", ".join(map(str, hm.var_names[:4]))
+        cols = ", ".join(hm.var.columns) or "(none)"
+        raise SystemExit(
+            "Could not find gene symbols in this HypoMap object.\n"
+            f"  var_names look like: {preview}\n"
+            f"  var columns: {cols}\n"
+            "Open it and check which column holds symbols such as Agrp or Pomc.")
+    print(f"  gene symbols taken from {best_where} ({best_hits} panel genes matched)")
+    return pd.Index(best)
+
+
 def annotation_levels(obs: pd.DataFrame) -> list[str]:
     """HypoMap's nested cluster columns, coarse to fine.
 
@@ -69,9 +101,13 @@ def annotation_levels(obs: pd.DataFrame) -> list[str]:
             and 3 <= obs[c].nunique() <= 600]
 
 
-def cluster_means(adata, key: str, genes: list[str]) -> pd.DataFrame:
+def cluster_means(adata, key: str, genes: list[str],
+                  symbols: pd.Index) -> pd.DataFrame:
     """Mean log-CPM per cluster, accumulated in chunks."""
-    idx = [adata.var_names.get_loc(g) for g in genes]
+    lookup = {}
+    for i, s in enumerate(symbols):
+        lookup.setdefault(str(s).lower(), i)
+    idx = [lookup[g.lower()] for g in genes]
     labels = adata.obs[key].astype(str).to_numpy()
     groups = pd.unique(labels)
     total = pd.DataFrame(0.0, index=groups, columns=genes)
@@ -114,15 +150,30 @@ def main() -> int:
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--hypomap", type=Path,
                    default=Path.home() / "Desktop" / "hypoMap.h5ad")
-    p.add_argument("--profiles", type=Path,
-                   default=Path("results/hypomap/xenium_celltype_profiles.csv"))
+    p.add_argument("--profiles", type=Path, default=None,
+                   help="defaults to xenium_celltype_profiles.csv beside this "
+                        "script, or in results/hypomap/")
     p.add_argument("--population", default="Glut Prdm8/Cbln1")
     p.add_argument("--top", type=int, default=8)
     p.add_argument("--out", type=Path, default=Path("results/hypomap"))
     args = p.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
 
-    prof = pd.read_csv(args.profiles, index_col=0)
+    # Look beside the script and in the repo layout before giving up, so the
+    # script works whether it was copied to a desktop or run from the repo.
+    name = "xenium_celltype_profiles.csv"
+    here = Path(__file__).resolve().parent
+    candidates = ([args.profiles] if args.profiles else
+                  [here / name, here.parent / "results" / "hypomap" / name,
+                   Path.cwd() / name, Path("results/hypomap") / name])
+    found = next((c for c in candidates if c and c.exists()), None)
+    if found is None:
+        raise SystemExit(
+            f"Could not find {name}. Looked in:\n  "
+            + "\n  ".join(str(c) for c in candidates)
+            + "\nPass it explicitly with --profiles /path/to/" + name)
+    print(f"Profiles: {found}")
+    prof = pd.read_csv(found, index_col=0)
     if args.population not in prof.index:
         raise SystemExit(f"{args.population!r} not in {args.profiles}. "
                          f"Available: {', '.join(prof.index[:10])} ...")
@@ -131,9 +182,11 @@ def main() -> int:
     hm = sc.read_h5ad(args.hypomap, backed="r")
     print(f"  {hm.n_obs:,} cells x {hm.n_vars:,} genes")
 
-    shared = [g for g in prof.columns if g in set(hm.var_names)]
+    symbols = resolve_symbols(hm, list(prof.columns))
+    have = {str(s).lower() for s in symbols}
+    shared = [g for g in prof.columns if g.lower() in have]
     print(f"  {len(shared)} of {prof.shape[1]} panel genes present in HypoMap")
-    missing = [g for g in prof.columns if g not in set(hm.var_names)]
+    missing = [g for g in prof.columns if g.lower() not in have]
     if missing:
         print(f"  absent: {', '.join(missing[:12])}"
               + (" ..." if len(missing) > 12 else ""))
@@ -147,7 +200,7 @@ def main() -> int:
     target = prof.loc[args.population, shared]
     all_hits = []
     for key in levels:
-        means = cluster_means(hm, key, shared)
+        means = cluster_means(hm, key, shared, symbols)
         hits = match(target, means)
         margin = (hits["spearman"].iloc[0] - hits["spearman"].iloc[1]
                   if len(hits) > 1 else np.nan)
@@ -173,8 +226,9 @@ def main() -> int:
 
     # Where does HypoMap put Galr1 and Gal?
     finest = levels[-1]
-    means = cluster_means(hm, finest, [g for g in ("Galr1", "Gal", "Galr3")
-                                       if g in hm.var_names])
+    means = cluster_means(hm, finest,
+                          [g for g in ("Galr1", "Gal", "Galr3")
+                           if g.lower() in have], symbols)
     print(f"=== Highest Galr1 clusters in HypoMap ({finest}) ===")
     print(means.sort_values("Galr1", ascending=False).head(12).round(3).to_string())
     means.to_csv(args.out / f"hypomap_{finest}_galanin.csv")
