@@ -1,0 +1,32 @@
+cell_type,n_cells,pct_pos_Galr1,pct_pos_Gal
+Astrocyte,16427,5.7,14.2
+Oligodendrocyte,15858,5.8,10.2
+GABA Cacna2d2,10133,19.4,19.6
+Glut Otp/Nrn1,8550,19.1,16.2
+Endothelial,6967,4.1,10.6
+VMH-like Glut Calb1,5824,17.1,16.4
+VLMC / fibroblast,4857,1.9,8.1
+ME / meningeal fibroblast,4748,1.7,7.3
+GABA Nts/Gal,4260,48.2,78.8
+VMH-like Glut Rasgrf2,4007,46.7,6.5
+OPC,3785,9.9,20.2
+Microglia,3500,6.3,16.2
+GABA Gal/Galr1,3173,66.1,84.8
+GABA Otp/Wfs1,2915,11.0,29.5
+Ependymal,2124,1.3,14.9
+LHA Hcrt (orexin),1974,22.1,49.7
+Mural (pericyte/SMC),1710,4.2,9.8
+ARC Pomc,1645,3.6,62.9
+Tanycyte,1572,1.2,15.1
+GABA Cartpt/Glp1r,1566,24.4,71.5
+GABA Igf1/Chodl,1552,9.0,33.1
+ARC Agrp/Npy,1496,5.6,53.5
+VMH-like Glut Tac1,1240,9.9,48.1
+GABA Nell1/Pcsk5,1165,61.8,62.4
+Glut Synpr/Syt6,991,20.9,57.8
+Glut Bcl11b/Prdm12,962,38.7,20.6
+ARC Th/Slc6a3 (TIDA),798,2.4,42.9
+DMH Grp/Ppp1r17,689,24.4,56.9
+Glut Prdm8/Cbln1,611,62.7,45.7
+Oxt/Avp magnocellular,543,36.8,82.1
+ARC Tac2/Esr1 (KNDy-like),330,17.0,99.4
