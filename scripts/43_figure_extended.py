@@ -11,7 +11,9 @@ reviewer would reasonably raise about the main figure.
   e  how often the significance criterion fires across the whole panel
   f  the conclusion is unchanged when segmentation is re-derived from raw
      transcripts rather than taken from the vendor
-  g  Fos in these neurons.  It falls steeply with age and does so in every
+  g  abundance of the population is unchanged, so the receptor result is
+     regulation and not a change in how many of these neurons there are
+  h  Fos in these neurons.  It falls steeply with age and does so in every
      block, but these animals are untreated, so immediate-early gene expression
      has no stimulus to be read against.  It is reported here rather than in the
      main figure for that reason, not because the measurement is weak.
@@ -57,7 +59,7 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True); SRC.mkdir(parents=True, exist_ok=True)
 
     fig = plt.figure(figsize=(FULL, 4.9))
-    gs = fig.add_gridspec(2, 4, height_ratios=[1, 1], hspace=.95, wspace=.95)
+    gs = fig.add_gridspec(2, 5, height_ratios=[1, 1], hspace=.95, wspace=1.05)
 
     # (a) design
     ax = fig.add_subplot(gs[0, 0]); panel(ax, "a")
@@ -170,8 +172,29 @@ def main() -> int:
     ax.set_title("matched objects,\nmatched depth", loc="left", pad=4,
                  color=MUTED, fontsize=5.8)
 
-    # (g) Fos
-    ax = fig.add_subplot(gs[1, 3]); panel(ax, "g", dx=-0.46)
+    # (g) abundance, (h) Fos
+    ax = fig.add_subplot(gs[1, 3]); panel(ax, "g", dx=-0.52)
+    abund = pd.read_csv(SRC / "fig_main_abundance.csv", index_col=0) \
+        if (SRC / "fig_main_abundance.csv").exists() else None
+    if abund is not None:
+        vals = abund["abundance"].to_dict()
+        for a_aged, a_adult in BLOCKS.values():
+            ax.plot([0, 1], [vals[a_adult], vals[a_aged]], color="#C9C9C9",
+                    lw=.6, zorder=1)
+        for j, (members, colour) in enumerate(
+                ((list(A_ADULT), ADULT), (list(A_AGED), C_AGED))):
+            ys = [vals[a] for a in members]
+            ax.scatter([j] * len(ys), ys, s=13, color=colour, zorder=3,
+                       linewidths=0, clip_on=False)
+            ax.plot([j - .22, j + .22], [np.mean(ys)] * 2, color=colour, lw=1.3,
+                    solid_capstyle="butt", zorder=2)
+        ax.set_xlim(-.45, 1.45); ax.set_xticks([0, 1])
+        ax.set_xticklabels(["adult", "aged"])
+        ax.set_ylabel("abundance (% of cells)")
+        ax.set_title("population size\nunchanged", loc="left", pad=4,
+                     color=MUTED, fontsize=5.8)
+
+    ax = fig.add_subplot(gs[1, 4]); panel(ax, "h", dx=-0.52)
     fos = pd.read_csv(SRC / "fig_main_stats.csv", index_col=0)
     per_animal = pd.read_csv(SRC / "fig_main_fos_per_animal.csv", index_col=0) \
         if (SRC / "fig_main_fos_per_animal.csv").exists() else None
@@ -192,7 +215,7 @@ def main() -> int:
         ax.set_ylabel("$\\it{Fos}$ (log$_2$ CPM)")
         r = fos.loc["Fos"]
         ax.set_title(f"{2 ** r.lfc:.2f}×  $P$ = {r.p:.3f}\nuntreated animals",
-                     loc="left", pad=3, color=MUTED, fontsize=5.8)
+                     loc="left", pad=4, color=MUTED, fontsize=5.8)
 
     fig.savefig(OUT / "figure_extended_data.pdf")
     fig.savefig(OUT / "figure_extended_data.png")

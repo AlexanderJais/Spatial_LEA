@@ -27,8 +27,28 @@ POP = "#4B2E83"
 TISSUE = "#DDDDDD"      # cells not central to the message
 OTHER_CELLS = "#BFBFBF"  # typed cells in a zoomed field, other than POP
 INK = "#1A1A1A"
-MUTED = "#666666"
+MUTED = "#1A1A1A"      # panel sub-headings are set in ink, not grey
 RULE = "#4D4D4D"
+
+# Registered hypothalamic subregions.  Muted, distinguishable, and always
+# accompanied by a direct label on the map, so colour is never the only channel
+# carrying the identity.  Territory that is not a named nucleus stays grey.
+NUCLEUS_COLOUR = {
+    "ARC": "#9C6114",
+    "ME_3V": "#C9A227",
+    "VMH": "#2C6FA8",
+    "DMH": "#6A3D9A",
+    "LHA": "#2E7D5B",
+    "ZI": "#A34E6B",
+    "DHA_PH": "#5B6B7A",
+    "TUseg": "#CFCFCF",
+    "fibre": "#E2E2E2",
+    "edge": "#EFEFEF",
+}
+NUCLEUS_LABEL = {
+    "ARC": "ARC", "ME_3V": "ME / 3V", "VMH": "VMH", "DMH": "DMH",
+    "LHA": "LHA", "ZI": "ZI", "DHA_PH": "DHA / PH",
+}
 
 MM = 1 / 25.4
 SINGLE, ONE_HALF, FULL = 89 * MM, 120 * MM, 183 * MM   # Nature column widths

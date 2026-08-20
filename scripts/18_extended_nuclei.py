@@ -32,38 +32,100 @@ import matplotlib.pyplot as plt  # noqa: E402
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
+from spatial_lea.io import counts_matrix  # noqa: E402
+
 PROC = REPO / "data" / "processed"
 OUT = REPO / "results" / "extended_nuclei"
 SPLIT_ML_UM = 500.0   # domain 8: medial fringe vs lateral hypothalamus
 
-# domain -> (nucleus, the evidence the call rests on)
-# Marker z-scores are across the 14 domains; positions are in the anatomical frame.
-DOMAIN_NUCLEUS = {
-    "9":  ("ARC",     "ARC markers z=+2.96 (Agrp, Pomc, Ghrh, Tac2); |ml| 172, dv 136"),
-    "12": ("ME_3V",   "tanycyte/ME z=+1.14, Gpr50 64% of cells; |ml| 40, dv 130 — 3V floor"),
-    "5":  ("ME_3V",   "tanycyte/ME z=+1.28, ependymal 58%; |ml| 29, dv 922 — dorsal 3V wall"),
-    "7":  ("VMH",     "VMH z=+0.86, Slc17a6 z=+2.13, Rasgrf2 58%; |ml| 246 — dorsomedial VMH"),
-    "4":  ("VMH",     "VMH z=+0.60, Slc17a6 z=+1.76, Calb1 41%; |ml| 443 — ventrolateral VMH"),
-    "13": ("DMH",     "DMH z=+1.41 (Grp, Ppp1r17); |ml| 265, dv 1100 — DMH core"),
-    "8":  ("SPLIT",   "LHA z=+2.11 laterally (Hcrt 64.5% beyond 500um) but Grp-enriched medially"),
-    "0":  ("ZI",      "GABA z=+1.77, Gad/Slc32a1 dominant, Cacna2d2 48%; dv 1548 — zona incerta"),
-    "10": ("DHA_PH",  "Slc17a6 z=+1.23, ZI z=-0.10 — glutamatergic, so not ZI; dorsal hypothalamic area"),
-    "3":  ("TUseg",   "no nucleus marker dominant; |ml| 715, dv 471 — tuberal / ventrolateral"),
-    "2":  ("fibre",   "oligodendrocyte 25%, |ml| 997 — fibre tract territory"),
-    "11": ("fibre",   "oligodendrocyte 67%, fibre z=+1.92 — internal capsule / optic tract"),
-    "1":  ("edge",    "meningeal fibroblast 74%, |ml| 1218 — tissue edge"),
-    "6":  ("edge",    "VLMC 62%, |ml| 910 — tissue edge"),
+# Nucleus definitions.  Each is a marker set plus the position it occupies in
+# the intrinsic anatomical frame, in micrometres.  Domains are matched to these
+# by evidence at run time.
+#
+# This replaces a hardcoded {KMeans domain id -> nucleus} table.  That table was
+# written against the domains derived from the first cohort; KMeans labels are
+# arbitrary integers, so when the domains were recomputed on the full set the
+# ids no longer meant what they had, and the old table was applied to the wrong
+# clusters.  Only the ARC happened to survive.  A mapping keyed on cluster
+# number cannot be reused across runs, so the assignment is now derived.
+NUCLEUS_DEF = {
+    "ARC":    {"markers": ["Agrp", "Pomc", "Ghrh", "Slc6a3"], "ml": 200, "dv": 150},
+    "ME_3V":  {"markers": ["Gpr50", "Spag16"],                "ml": 60,  "dv": 400},
+    "VMH":    {"markers": ["Adcyap1", "Calb1", "Rasgrf2"],    "ml": 380, "dv": 560},
+    "DMH":    {"markers": ["Grp", "Ppp1r17"],                 "ml": 260, "dv": 1050},
+    "LHA":    {"markers": ["Hcrt"],                           "ml": 900, "dv": 900},
+    "ZI":     {"markers": ["Cacna2d2", "Pvalb", "Slc32a1"],   "ml": 700, "dv": 1450},
+    "DHA_PH": {"markers": ["Slc17a6", "Otp"],                 "ml": 500, "dv": 1330},
 }
+# How far a domain may sit from a nucleus centre before position stops
+# supporting the call.  Generous: it separates nuclei, it does not define them.
+POS_SCALE_UM = 700.0
+# A domain has to be positively supported to be given a nucleus name.  Below
+# this it is left as unassigned tuberal territory rather than absorbed into the
+# nearest nucleus, which is what inflated the VMH on the first pass.
+MIN_SCORE = 0.45
+
+
+def domain_profile(adata, obs: pd.DataFrame) -> tuple:
+    """Per-domain marker z-scores, position, and composition."""
+    doms = sorted(obs["domain"].astype(str).unique(), key=int)
+    counts = counts_matrix(adata)
+    genes = adata.var_names.to_numpy()
+    dom = obs["domain"].astype(str).to_numpy()
+    cpm = {}
+    for d in doms:
+        m = dom == d
+        c = counts[m]
+        cpm[d] = np.log2(c.sum(axis=0) / max(c.sum(), 1) * 1e6 + 1)
+    cpm = pd.DataFrame(cpm, index=genes).T
+    z = (cpm - cpm.mean()) / cpm.std().replace(0, np.nan)
+    pos = obs.assign(dom=dom).groupby("dom").agg(
+        absml=("ml", lambda x: float(np.median(np.abs(x)))),
+        dv=("dv", "median"), cells=("dv", "size"))
+    return z, pos.loc[doms]
+
+
+def score_domains(z: pd.DataFrame, pos: pd.DataFrame) -> pd.DataFrame:
+    """Evidence for each nucleus in each domain: markers plus position."""
+    rows = {}
+    for nucleus, spec in NUCLEUS_DEF.items():
+        present = [g for g in spec["markers"] if g in z.columns]
+        marker = z[present].mean(axis=1) if present else pd.Series(0.0, index=z.index)
+        dist = np.hypot(pos["absml"] - spec["ml"], pos["dv"] - spec["dv"])
+        rows[nucleus] = marker - dist / POS_SCALE_UM
+    return pd.DataFrame(rows)
+
+
+def assign_by_evidence(scores: pd.DataFrame, obs: pd.DataFrame,
+                       composition: pd.DataFrame) -> dict:
+    """Best-supported nucleus per domain; glial-dominated domains stay unnamed."""
+    out = {}
+    for d in scores.index:
+        top = composition.loc[d].idxmax() if d in composition.index else ""
+        frac = composition.loc[d].max() if d in composition.index else 0.0
+        if top in ("ME / meningeal fibroblast", "VLMC / fibroblast",
+                   "Arachnoid fibroblast") and frac > .35:
+            out[d] = ("edge", f"{top} {frac*100:.0f}% — tissue edge")
+            continue
+        if top == "Oligodendrocyte" and frac > .35:
+            out[d] = ("fibre", f"oligodendrocyte {frac*100:.0f}% — fibre tract")
+            continue
+        best = scores.loc[d].idxmax()
+        value = scores.loc[d].max()
+        if value < MIN_SCORE:
+            out[d] = ("TUseg", f"no nucleus supported (best {best} {value:+.2f})")
+        else:
+            out[d] = (best, f"{best} score {value:+.2f}")
+    return out
+
+
 ANALYSIS_NUCLEI = ("ARC", "ME_3V", "VMH", "DMH", "LHA", "ZI", "DHA_PH")
 
 
-def assign(obs: pd.DataFrame) -> pd.Series:
+def assign(obs: pd.DataFrame, mapping: dict) -> pd.Series:
     dom = obs["domain"].astype(str)
-    out = pd.Series([DOMAIN_NUCLEUS.get(d, ("unassigned", ""))[0] for d in dom], index=obs.index)
-    medial = obs["ml"].abs() < SPLIT_ML_UM
-    out[(dom == "8") & medial] = "DMH"
-    out[(dom == "8") & ~medial] = "LHA"
-    return out
+    return pd.Series([mapping.get(d, ("unassigned", ""))[0] for d in dom],
+                     index=obs.index)
 
 
 def extent(obs: pd.DataFrame, nucleus: str) -> dict:
@@ -83,27 +145,34 @@ def extent(obs: pd.DataFrame, nucleus: str) -> dict:
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     adata = sc.read_h5ad(PROC / "hypothalamus_domains.h5ad")
-    adata.obs["nucleus_ext"] = assign(adata.obs).to_numpy()
+    obs = adata.obs
+    z, pos = domain_profile(adata, obs)
+    scores = score_domains(z, pos)
+    comp = pd.crosstab(obs["domain"].astype(str), obs["cell_type"].astype(str),
+                       normalize="index")
+    mapping = assign_by_evidence(scores, obs, comp)
+    adata.obs["nucleus_ext"] = assign(obs, mapping).to_numpy()
 
-    print("=== Domain -> nucleus assignment ===")
-    for dom, (nucleus, why) in sorted(DOMAIN_NUCLEUS.items(), key=lambda kv: int(kv[0])):
-        print(f"  domain {dom:>2s} -> {nucleus:8s} {why}")
-    print(f"\n  domain 8 split at |ml| = {SPLIT_ML_UM:.0f} um: medial -> DMH, lateral -> LHA")
+    print("=== Domain -> nucleus assignment, derived from the data ===")
+    print(f"  {'dom':>3s} {'cells':>6s} {'|ml|':>6s} {'dv':>6s}  {'call':8s} evidence")
+    for d in sorted(mapping, key=int):
+        nucleus, why = mapping[d]
+        print(f"  {d:>3s} {int(pos.loc[d, 'cells']):6d} "
+              f"{pos.loc[d, 'absml']:6.0f} {pos.loc[d, 'dv']:6.0f}  {nucleus:8s} {why}")
+    print("\n=== Score matrix (marker z minus distance penalty) ===")
+    print(scores.round(2).to_string())
 
     ext = pd.DataFrame([extent(adata.obs, n) for n in ANALYSIS_NUCLEI]).dropna(how="all")
     ext.to_csv(OUT / "nucleus_extents.csv", index=False)
     print("\n=== Extent of each nucleus (p5-p95, anatomical frame) ===")
     print(ext.to_string(index=False))
 
-    old = pd.read_csv(REPO / "results" / "anatomy" / "cells_per_nucleus.csv", index_col=0)
-    print("\n=== DMH: how the delineation has changed ===")
-    prev_dmh = int(old["DMH"].sum()) if "DMH" in old else 0
-    dmh = ext[ext.nucleus == "DMH"].iloc[0]
-    print(f"  Gaussian ellipse (Grp-anchored) : 13,235 cells, 1084 x 380 um")
-    print(f"  domain 13 alone                 : 12,441 cells, 1026 x 469 um")
-    print(f"  domain 13 + medial fringe of 8  : {dmh.cells:,} cells, "
-          f"{dmh.width_um} x {dmh.height_um} um")
-    print(f"  published mouse DMH             : ~800-1200 x 500-700 um")
+    if "DMH" in set(ext.nucleus):
+        dmh = ext[ext.nucleus == "DMH"].iloc[0]
+        print("\n=== DMH against published dimensions ===")
+        print(f"  derived here        : {dmh.cells:,} cells, "
+              f"{dmh.width_um} x {dmh.height_um} um")
+        print(f"  published mouse DMH : ~800-1200 x 500-700 um")
 
     print("\n=== Cells per nucleus per animal (balance across the design) ===")
     tab = pd.crosstab(adata.obs["animal"], adata.obs["nucleus_ext"])
