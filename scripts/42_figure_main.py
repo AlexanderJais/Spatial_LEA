@@ -9,11 +9,11 @@ Single biological conclusion the figure supports:
 Panels:
   a  where the neurons are: one intact section, then every neuron of this type
      from all eight animals in the shared anatomical frame
-  b  what they are, with the four genes that define them for this study
-  c  Galr1 rises      } one point per animal, adult and aged joined within block
-  d  Ghsr rises       }
-  e  abundance is unchanged, so this is regulation and not cell loss
-  f  every gene that separates the groups completely, for context
+  c  Galr1 tested in every cell type with enough cells: of twenty, one moves
+     consistently and separates the animals, which is what makes the result a
+     statement about this population rather than about ageing hypothalamus
+  d  Galr1 in that population, one point per animal, paired within block
+  e  Ghsr, the second receptor these neurons carry, behaves the same way
 
 Choices made by rule rather than by eye:
   * representative section = the section with the highest whole-section bilateral
@@ -62,7 +62,7 @@ ANIMALS = list(A_ADULT) + list(A_AGED)
 # Priority order for this study; Galr1 leads, then the peptide that names the
 # population, then the other two receptors it carries.
 KEY_GENES = ["Galr1", "Ghrh", "Ghsr", "Galr3"]
-MAIN_GENES = ["Galr1", "Gal", "Ghsr"]
+MAIN_GENES = ["Galr1", "Ghsr"]
 CONTEXT_MARKERS = 8
 
 
@@ -145,9 +145,9 @@ def main() -> int:
     whole.file.close()
 
     fig = plt.figure(figsize=(FULL, 4.6))
-    outer = fig.add_gridspec(2, 1, height_ratios=[1.06, .94], hspace=.50)
+    outer = fig.add_gridspec(2, 1, height_ratios=[1.12, .88], hspace=.52)
     top = outer[0].subgridspec(1, 3, width_ratios=[1.30, 1.05, .95], wspace=.36)
-    bot = outer[1].subgridspec(1, 4, width_ratios=[1, 1, 1, 1.05], wspace=.62)
+    bot = outer[1].subgridspec(1, 3, width_ratios=[1, 1, 1.32], wspace=.60)
 
     # (a) the registered subregions this panel resolves
     ax = fig.add_subplot(top[0]); panel(ax, "a", dx=-0.05, dy=1.13)
@@ -190,49 +190,35 @@ def main() -> int:
                 color=POP, va="top", ha="left")
     ax.set_title("representative image", loc="left", pad=2, x=.03)
 
-    # (c) what defines them
-    ax = fig.add_subplot(top[2]); panel(ax, "c", dx=-0.40, dy=1.13)
-    frac = pd.Series((counts[is_pop] > 0).mean(axis=0) * 100, index=var)
-    show = ["Cbln1", "Slc17a6", "Otp", "Prdm8", "Bdnf", "Galr1", "Ghsr",
-            "Galr3", "Gal", "Ghrh"]
-    show = [g for g in show if g in frac.index][::-1]
-    ax.barh(range(len(show)), frac[show].values, height=.7,
-            color=[POP if g in ("Galr1", "Gal") else "#B9B9B9" for g in show])
-    ax.set_yticks(range(len(show)))
-    ax.set_yticklabels([f"$\\it{{{g}}}$" for g in show])
-    ax.tick_params(axis="y", length=0)
-    ax.set_xlabel("% of these neurons positive")
-    ax.set_xlim(0, 105)
-
-    # (d-f) the galanin and ghrelin receptors
-    for j, gene in enumerate(MAIN_GENES):
-        ax = fig.add_subplot(bot[j]); panel(ax, "def"[j], dx=-0.48)
-        r = stats.loc[gene]
-        sig = "$P$ = %.3f" % r.p
-        paired_panel(ax, cpm[gene].to_dict(), f"$\\it{{{gene}}}$ (log$_2$ CPM)",
-                     f"{2 ** r.lfc:.2f}×  {sig}")
-
-    # (g) every gene that separates the groups completely
-    ax = fig.add_subplot(bot[3]); panel(ax, "g", dx=-0.34)
-    sep = stats[(stats.blocks == 4) & (stats.margin > 0)]
-    sep = sep.reindex(sep.lfc.sort_values().index)
-    ys = np.arange(len(sep))
-    for b in BLOCKS:
-        ax.scatter(sep[f"lfc_{b}"], ys, s=4, facecolors="none",
-                   edgecolors="#B8B8B8", linewidths=.4, zorder=2)
-    ax.scatter(sep["lfc"], ys, s=9, color=INK, zorder=3, linewidths=0)
+    # (c) is the increase specific?  Galr1 in every cell type that has enough
+    # cells in all eight animals.  Nothing is filtered on significance.
+    ax = fig.add_subplot(top[2]); panel(ax, "c", dx=-0.30, dy=1.13)
+    by_ct = pd.read_csv(SRC / "galr1_by_celltype.csv")
+    by_ct = by_ct.sort_values("lfc")
+    ys = np.arange(len(by_ct))
+    passes = ((by_ct.blocks == 4) & (by_ct.margin > 0)).to_numpy()
     ax.axvline(0, color=INK, lw=.5)
-    ax.set_yticks([]); ax.set_ylim(-1.2, len(sep) + .4)
-    ax.set_xlabel("aged / adult (log$_2$)")
-    ax.set_ylabel(f"{len(sep)} genes, ranked")
-    for g, dyy in (("Galr1", 6), ("Ghsr", -6)):
-        if g in sep.index:
-            y = int(np.where(sep.index == g)[0][0])
-            ax.annotate(f"$\\it{{{g}}}$", (sep.lfc[g], y), xytext=(7, dyy),
-                        textcoords="offset points", fontsize=5.5, va="center",
-                        ha="left", color=INK)
-    ax.set_xlim(sep[[f"lfc_{b}" for b in BLOCKS]].min().min() - .4,
-                sep[[f"lfc_{b}" for b in BLOCKS]].max().max() + 1.4)
+    ax.scatter(by_ct.lfc[~passes], ys[~passes], s=11, color="#B0B0B0",
+               linewidths=0, zorder=3)
+    ax.scatter(by_ct.lfc[passes], ys[passes], s=26, color=POP, linewidths=0,
+               zorder=4)
+    for y, row in zip(ys[passes], by_ct[passes].itertuples()):
+        ax.annotate(row.cell_type, (row.lfc, y), xytext=(7, 0),
+                    textcoords="offset points", fontsize=5.4, va="center",
+                    ha="left", color=POP, fontweight="bold")
+    ax.set_yticks([]); ax.set_ylim(-1, len(by_ct))
+    ax.set_xlim(-0.75, 1.75)
+    ax.set_xlabel("$\\it{Galr1}$, aged / adult (log$_2$)")
+    ax.set_ylabel(f"{len(by_ct)} cell types")
+    ax.set_title(f"{int(passes.sum())} of {len(by_ct)} cell types change",
+                 loc="left", pad=2)
+
+    # (d, e) the receptors in that population
+    for j, gene in enumerate(MAIN_GENES):
+        ax = fig.add_subplot(bot[j]); panel(ax, "de"[j], dx=-0.34)
+        r = stats.loc[gene]
+        paired_panel(ax, cpm[gene].to_dict(), f"$\\it{{{gene}}}$ (log$_2$ CPM)",
+                     f"{2 ** r.lfc:.2f}×  $P$ = {r.p:.3f}")
 
     fig.savefig(OUT / "figure_main.pdf")
     fig.savefig(OUT / "figure_main.png")
