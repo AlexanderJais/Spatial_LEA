@@ -60,13 +60,22 @@ SINGLE, ONE_HALF, FULL = 89 * MM, 120 * MM, 183 * MM   # Nature column widths
 
 
 def use_style() -> None:
-    for path in glob.glob("/usr/share/fonts/**/NimbusSans*.otf", recursive=True):
-        try:
-            fm.fontManager.addfont(path)
-        except Exception:
-            pass
-    family = ("Nimbus Sans" if any(f.name == "Nimbus Sans" for f in fm.fontManager.ttflist)
-              else "DejaVu Sans")
+    for pattern in ("/usr/share/fonts/**/NimbusSans*.otf",
+                    "/usr/share/fonts/**/NimbusSans-*.otf"):
+        for path in glob.glob(pattern, recursive=True):
+            try:
+                fm.fontManager.addfont(path)
+            except Exception:
+                pass
+    # Nimbus Sans is the Helvetica metric clone; Liberation Sans is the Arial
+    # one and is the next best thing.  DejaVu is matplotlib's default and looks
+    # nothing like either, so it is the last resort rather than a silent one.
+    have = {f.name for f in fm.fontManager.ttflist}
+    family = next((f for f in ("Nimbus Sans", "Helvetica", "Liberation Sans",
+                               "Arial", "DejaVu Sans") if f in have), "DejaVu Sans")
+    if family != "Nimbus Sans":
+        print(f"[figstyle] Nimbus Sans not installed; using {family}. "
+              "apt install fonts-urw-base35")
     mpl.rcParams.update({
         "font.family": "sans-serif",
         "font.sans-serif": [family, "Helvetica", "Arial", "DejaVu Sans"],
@@ -111,3 +120,13 @@ def bare(ax) -> None:
     ax.set_xticks([]); ax.set_yticks([])
     for s in ax.spines.values():
         s.set_visible(False)
+
+
+def wash(colour: str, amount: float = .55) -> tuple:
+    """Mix a colour towards white.
+
+    Subregions are the ground of a spatial panel, not its subject, so they are
+    drawn as washes and full saturation is left to the cells plotted on them.
+    """
+    rgb = [int(colour[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    return tuple(c + (1 - c) * amount for c in rgb)
