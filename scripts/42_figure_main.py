@@ -9,11 +9,14 @@ Single biological conclusion the figure supports:
 Panels:
   a  where the neurons are: one intact section, then every neuron of this type
      from all eight animals in the shared anatomical frame
-  c  Galr1 tested in every cell type with enough cells: of twenty, one moves
+  c  which subregion they belong to: enrichment over the whole window, DMH
+     highest
+  d  what they are, matched against HypoMap at the C185 level
+  e  Galr1 tested in every cell type with enough cells: of twenty, one moves
      consistently and separates the animals, which is what makes the result a
      statement about this population rather than about ageing hypothalamus
-  d  Galr1 in that population, one point per animal, paired within block
-  e  Ghsr, the second receptor these neurons carry, behaves the same way
+  f  Galr1 in that population, one point per animal, paired within block
+  g  Ghsr, the second receptor these neurons carry, behaves the same way
 
 Choices made by rule rather than by eye:
   * representative section = the section with the highest whole-section bilateral
@@ -144,10 +147,10 @@ def main() -> int:
     rep = max(balance, key=balance.get)
     whole.file.close()
 
-    fig = plt.figure(figsize=(FULL, 4.6))
-    outer = fig.add_gridspec(2, 1, height_ratios=[1.12, .88], hspace=.52)
+    fig = plt.figure(figsize=(FULL, 5.0))
+    outer = fig.add_gridspec(2, 1, height_ratios=[1.05, .95], hspace=.60)
     top = outer[0].subgridspec(1, 3, width_ratios=[1.30, 1.05, .95], wspace=.36)
-    bot = outer[1].subgridspec(1, 3, width_ratios=[1, 1, 1.32], wspace=.60)
+    bot = outer[1].subgridspec(1, 4, width_ratios=[1.35, 1.15, .95, .95], wspace=.72)
 
     # (a) the registered subregions this panel resolves
     ax = fig.add_subplot(top[0]); panel(ax, "a", dx=-0.05, dy=1.13)
@@ -190,32 +193,64 @@ def main() -> int:
                 color=POP, va="top", ha="left")
     ax.set_title("representative image", loc="left", pad=2, x=.03)
 
-    # (c) is the increase specific?  Galr1 in every cell type that has enough
-    # cells in all eight animals.  Nothing is filtered on significance.
-    ax = fig.add_subplot(top[2]); panel(ax, "c", dx=-0.30, dy=1.13)
-    by_ct = pd.read_csv(SRC / "galr1_by_celltype.csv")
-    by_ct = by_ct.sort_values("lfc")
+    # (c) which subregion
+    ax = fig.add_subplot(top[2]); panel(ax, "c", dx=-0.42, dy=1.13)
+    enr = pd.read_csv(SRC / "population_regional_enrichment.csv")
+    enr = enr.sort_values("enrichment")
+    ys = np.arange(len(enr))
+    ax.barh(ys, enr.enrichment, height=.68,
+            color=[POP if n == "DMH" else "#C4C4C4" for n in enr.nucleus])
+    ax.axvline(1, color=INK, lw=.5)
+    ax.set_yticks(ys)
+    ax.set_yticklabels([NUCLEUS_LABEL.get(n, n) for n in enr.nucleus])
+    for tick, n in zip(ax.get_yticklabels(), enr.nucleus):
+        tick.set_fontweight("bold" if n == "DMH" else "normal")
+    ax.tick_params(axis="y", length=0)
+    ax.set_xlabel("enrichment over the whole window")
+    ax.set_title("most enriched in DMH", loc="left", pad=2)
+
+    # (d) HypoMap identity, C185 level
+    ax = fig.add_subplot(bot[0]); panel(ax, "d", dx=-0.40)
+    hm = pd.read_csv(REPO / "results" / "hypomap" /
+                     "hypomap_C185_named_all_celltypes.csv", index_col=0)
+    top_hm = hm[POPNAME].sort_values(ascending=False).head(6)[::-1]
+    names = [i.split(": ", 1)[-1] for i in top_hm.index]
+    # top_hm is reversed for plotting, so the best match is the LAST bar.
+    ax.barh(range(len(top_hm)), top_hm.values, height=.68,
+            color=["#C4C4C4"] * (len(top_hm) - 1) + [POP])
+    ax.set_yticks(range(len(top_hm)))
+    ax.set_yticklabels(names, fontsize=5.4)
+    for tick, keep in zip(ax.get_yticklabels(),
+                          [False] * (len(top_hm) - 1) + [True]):
+        tick.set_fontweight("bold" if keep else "normal")
+    ax.tick_params(axis="y", length=0)
+    ax.set_xlim(.6, .95)
+    ax.set_xlabel("Spearman ρ to HypoMap C185")
+    ax.set_title("HypoMap identity", loc="left", pad=2)
+
+    # (e) is the increase specific?  Galr1 in every cell type with enough cells.
+    ax = fig.add_subplot(bot[1]); panel(ax, "e", dx=-0.34)
+    by_ct = pd.read_csv(SRC / "galr1_by_celltype.csv").sort_values("lfc")
     ys = np.arange(len(by_ct))
     passes = ((by_ct.blocks == 4) & (by_ct.margin > 0)).to_numpy()
     ax.axvline(0, color=INK, lw=.5)
-    ax.scatter(by_ct.lfc[~passes], ys[~passes], s=11, color="#B0B0B0",
+    ax.scatter(by_ct.lfc[~passes], ys[~passes], s=10, color="#B0B0B0",
                linewidths=0, zorder=3)
-    ax.scatter(by_ct.lfc[passes], ys[passes], s=26, color=POP, linewidths=0,
+    ax.scatter(by_ct.lfc[passes], ys[passes], s=24, color=POP, linewidths=0,
                zorder=4)
     for y, row in zip(ys[passes], by_ct[passes].itertuples()):
-        ax.annotate(row.cell_type, (row.lfc, y), xytext=(7, 0),
+        ax.annotate("this population", (row.lfc, y), xytext=(6, 0),
                     textcoords="offset points", fontsize=5.4, va="center",
                     ha="left", color=POP, fontweight="bold")
     ax.set_yticks([]); ax.set_ylim(-1, len(by_ct))
-    ax.set_xlim(-0.75, 1.75)
+    ax.set_xlim(-0.75, 1.9)
     ax.set_xlabel("$\\it{Galr1}$, aged / adult (log$_2$)")
     ax.set_ylabel(f"{len(by_ct)} cell types")
-    ax.set_title(f"{int(passes.sum())} of {len(by_ct)} cell types change",
-                 loc="left", pad=2)
+    ax.set_title(f"{int(passes.sum())} of {len(by_ct)} change", loc="left", pad=2)
 
-    # (d, e) the receptors in that population
+    # (f, g) the receptors in that population
     for j, gene in enumerate(MAIN_GENES):
-        ax = fig.add_subplot(bot[j]); panel(ax, "de"[j], dx=-0.34)
+        ax = fig.add_subplot(bot[j + 2]); panel(ax, "fg"[j], dx=-0.40)
         r = stats.loc[gene]
         paired_panel(ax, cpm[gene].to_dict(), f"$\\it{{{gene}}}$ (log$_2$ CPM)",
                      f"{2 ** r.lfc:.2f}×  $P$ = {r.p:.3f}")
