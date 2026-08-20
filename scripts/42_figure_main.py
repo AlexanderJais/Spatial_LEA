@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
-"""Figure 1: which MBH cells upregulate Galr1 with age.
+"""Figure 1: which MBH cells change Galr1 between adult and aged mice.
 
     Galr1 is expressed across the mediobasal hypothalamus.  In which cells does
-    it change between adult and aged mice?
+    it change with age?
 
-    One population: a glutamatergic Otp+/Cbln1+/Prdm8+ cell type of the dorsal
-    hypothalamus, which gains Galr1 and Ghsr with age.
+    One: a glutamatergic Otp+/Cbln1+/Prdm8+ cell type of the dorsal
+    hypothalamus.  What that population is, and what else changes in it, is
+    Figure 2 (45_figure_population.py).
 
 Panels:
   a  the registered subregions, every cell from all eight animals pooled in the
-     shared anatomical frame, with this population on top
-  b  Galr1 expression across the cell types the design can test
-  c  the age effect, per block: a clustered heatmap of Galr1 aged-minus-adult in
-     each of the four animal pairs, so consistency is visible rather than
-     summarised away.  Cell types that change significantly are marked
-  d  the same cells in expression space (UMAP), with the population that moved
-  e  its HypoMap C185 correspondence
-  f  Galr1 in that population, one point per animal, paired within block
-  g  Ghsr, the second receptor these neurons carry, behaves the same way
+     shared anatomical frame, with the population that changes on top
+  b  Galr1 in adult against aged, in every cell type the design can test.  Group
+     means joined, one small point per animal; this is the comparison the study
+     is about, so it is shown for all cell types at once and not summarised to
+     a fold change
+  c  the same data per animal: Galr1 z-scored across the eight animals, adult
+     block then aged block, cell types clustered by their pattern.  A cell type
+     that separates the groups shows as a left-right split in its row
+  d  Galr1 in the cell type that changes, one point per animal, paired within
+     block
 
 Choices made by rule rather than by eye:
   * a cell type enters the screen when every animal contributes at least
@@ -73,12 +75,8 @@ from spatial_lea.io import (  # noqa: E402
 PROC = REPO / "data" / "processed"
 OUT = REPO / "results" / "figures"
 SRC = OUT / "source_data"
-HYPOMAP = REPO / "results" / "hypomap" / "hypomap_C185_named_all_celltypes.csv"
 POPNAME = "Glut Prdm8/Cbln1"
 ANIMALS = list(A_ADULT) + list(A_AGED)
-KEY_GENES = ["Galr1", "Ghrh", "Ghsr", "Galr3"]
-MAIN_GENES = ["Galr1", "Ghsr"]
-HYPOMAP_SHOWN = 6
 # Entry criteria for the screen, both applied before any statistic is looked at.
 MIN_CELLS_PER_ANIMAL = 30
 MIN_PCT_POS = 10.0
@@ -124,50 +122,43 @@ def blocked_stats(cpm: pd.DataFrame) -> pd.DataFrame:
 
 
 def galr1_screen(counts: np.ndarray, var: np.ndarray, cell_types: np.ndarray,
-                 animals: np.ndarray) -> tuple[pd.DataFrame, list]:
+                 animals: np.ndarray) -> tuple[pd.DataFrame, pd.DataFrame, list]:
     """Galr1 in every cell type the design can test, by one rule throughout.
 
-    Returns the table and the types the entry criteria excluded, so the second
-    is reported rather than left implicit.
+    Returns the per-type statistics, the per-animal Galr1 level behind them, and
+    the types the entry criteria excluded -- the last so it is reported rather
+    than left implicit.
     """
     gene = int(np.flatnonzero(var == "Galr1")[0])
-    rows, excluded = [], []
+    rows, per_animal_cpm, excluded = [], {}, []
     for name in pd.unique(cell_types):
         if str(name).startswith(("unlabelled", "unresolved")):
             continue
         sel = cell_types == name
-        per_animal = [int((sel & (animals == a)).sum()) for a in ANIMALS]
+        n_per_animal = [int((sel & (animals == a)).sum()) for a in ANIMALS]
         pct_pos = float((counts[sel][:, gene] > 0).mean() * 100)
-        if min(per_animal) < MIN_CELLS_PER_ANIMAL:
-            excluded.append((name, f"{min(per_animal)} cells in the thinnest animal"))
+        if min(n_per_animal) < MIN_CELLS_PER_ANIMAL:
+            excluded.append((name, f"{min(n_per_animal)} cells in the thinnest animal"))
             continue
         if pct_pos < MIN_PCT_POS:
-            excluded.append((name, f"{pct_pos:.1f}% of cells $Galr1$+"))
+            excluded.append((name, f"{pct_pos:.1f}% of cells Galr1+"))
             continue
         mat = pd.DataFrame({a: counts[sel & (animals == a)].sum(axis=0)
                             for a in ANIMALS}, index=var).T
-        cpm = np.log2(mat.div(mat.sum(axis=1), axis=0) * 1e6 + 1)
-        r = blocked_stats(cpm).loc["Galr1"]
-        row = {"cell_type": name, "n_cells": int(sel.sum()),
-               "min_cells": min(per_animal), "pct_pos": round(pct_pos, 1),
-               "cpm": round(float(np.log2(counts[sel][:, gene].sum()
-                                          / counts[sel].sum() * 1e6 + 1)), 2),
-               "lfc": round(float(r.lfc), 3), "fold": round(float(2 ** r.lfc), 2),
-               "blocks": int(r.blocks), "p": round(float(r.p), 4),
-               "margin": round(float(r.margin), 3)}
-        for b in BLOCKS:
-            row[f"lfc_{b}"] = round(float(r[f"lfc_{b}"]), 3)
-        rows.append(row)
+        linear = mat.div(mat.sum(axis=1), axis=0) * 1e6
+        r = blocked_stats(np.log2(linear + 1)).loc["Galr1"]
+        per_animal_cpm[name] = linear["Galr1"]
+        rows.append({"cell_type": name, "n_cells": int(sel.sum()),
+                     "min_cells": min(n_per_animal), "pct_pos": round(pct_pos, 1),
+                     "cpm": round(float(counts[sel][:, gene].sum()
+                                        / counts[sel].sum() * 1e6), 1),
+                     "lfc": round(float(r.lfc), 3), "fold": round(float(2 ** r.lfc), 2),
+                     "blocks": int(r.blocks), "p": round(float(r.p), 4),
+                     "margin": round(float(r.margin), 3)})
     out = pd.DataFrame(rows)
     out["significant"] = ((out.blocks == 4) & (out.margin > 0) & (out.p <= MAX_P))
-    return out.sort_values("lfc", ascending=False), excluded
-
-
-def population_markers(counts: np.ndarray, var: np.ndarray,
-                       is_pop: np.ndarray) -> pd.Series:
-    inside = counts[is_pop].sum(axis=0) / counts[is_pop].sum() * 1e6
-    outside = counts[~is_pop].sum(axis=0) / counts[~is_pop].sum() * 1e6
-    return pd.Series(np.log2((inside + 1) / (outside + 1)), index=var)
+    out = out.sort_values("lfc", ascending=False)
+    return out, pd.DataFrame(per_animal_cpm).T.loc[out.cell_type], excluded
 
 
 def paired_panel(ax, values: dict, ylabel: str, title: str) -> None:
@@ -181,8 +172,8 @@ def paired_panel(ax, values: dict, ylabel: str, title: str) -> None:
                 lw=.6, zorder=1)
     for j, (members, colour) in enumerate(((A_ADULT, ADULT), (A_AGED, C_AGED))):
         ys = [values[a] for a in members]
-        ax.scatter([j] * len(ys), ys, s=13, color=colour, zorder=3, linewidths=0)
-        ax.plot([j - .22, j + .22], [np.mean(ys)] * 2, color=colour, lw=1.3,
+        ax.scatter([j] * len(ys), ys, s=15, color=colour, zorder=3, linewidths=0)
+        ax.plot([j - .22, j + .22], [np.mean(ys)] * 2, color=colour, lw=1.4,
                 solid_capstyle="butt", zorder=2)
     ax.set_xlim(-.45, 1.45); ax.set_xticks([0, 1])
     ax.set_xticklabels(["adult", "aged"])
@@ -208,31 +199,24 @@ def main() -> int:
     counts = counts_matrix(win)
     var = win.var_names.to_numpy()
 
+    screen, per_animal, excluded = galr1_screen(counts, var, cell_types, animals)
+    screen.to_csv(SRC / "galr1_by_celltype.csv", index=False)
+    per_animal.to_csv(SRC / "galr1_by_celltype_per_animal.csv")
+
     mat = pd.DataFrame({a: counts[is_pop & (animals == a)].sum(axis=0)
                         for a in ANIMALS}, index=var).T
-    expressed = mat.sum(axis=0) >= 200
-    frac = mat.div(mat.sum(axis=1), axis=0) * 1e6
-    cpm = np.log2(frac + 1)
-    stats = blocked_stats(cpm)[expressed]
-    stats.to_csv(SRC / "fig_main_stats.csv")
-    cpm.loc[ANIMALS, [g for g in ("Fos",) if g in cpm.columns]].to_csv(
-        SRC / "fig_main_fos_per_animal.csv")
-    pct = {a: (is_pop & (animals == a)).sum() / (animals == a).sum() * 100
-           for a in ANIMALS}
-    pd.DataFrame({"abundance": pct}).loc[ANIMALS].to_csv(SRC / "fig_main_abundance.csv")
+    pop_cpm = mat.div(mat.sum(axis=1), axis=0) * 1e6
+    pop_stats = blocked_stats(np.log2(pop_cpm + 1))[mat.sum(axis=0) >= 200]
+    pop_stats.to_csv(SRC / "fig_main_stats.csv")
+    pd.DataFrame({"abundance": {a: (is_pop & (animals == a)).sum()
+                                / (animals == a).sum() * 100 for a in ANIMALS}}
+                 ).loc[ANIMALS].to_csv(SRC / "fig_main_abundance.csv")
 
-    screen, excluded = galr1_screen(counts, var, cell_types, animals)
-    screen.to_csv(SRC / "galr1_by_celltype.csv", index=False)
-    markers = population_markers(counts, var, is_pop)
-    markers.sort_values(ascending=False).to_csv(SRC / "population_markers.csv")
-
-    fig = plt.figure(figsize=(FULL, 5.4))
-    outer = fig.add_gridspec(2, 1, height_ratios=[1.0, 1.0], hspace=.55)
-    top = outer[0].subgridspec(1, 3, width_ratios=[1.45, 1.15, 1.30], wspace=.60)
-    bot = outer[1].subgridspec(1, 4, width_ratios=[1.15, 1.30, .85, .85], wspace=1.02)
+    fig = plt.figure(figsize=(FULL, 3.05))
+    gs = fig.add_gridspec(1, 4, width_ratios=[1.55, 1.15, 1.25, .68], wspace=.92)
 
     # (a) the registered subregions, pooled, with the population on them
-    ax = fig.add_subplot(top[0]); panel(ax, "a", dx=-0.04, dy=1.13)
+    ax = fig.add_subplot(gs[0]); panel(ax, "a", dx=-0.04, dy=1.10)
     present = [k for k in NUCLEUS_LABEL if (nuc == k).any()]
     for key in ("edge", "fibre", "TUseg"):
         m = nuc == key
@@ -258,119 +242,102 @@ def main() -> int:
     scalebar(ax, 500, "500 µm")
     ax.legend(handles=[Line2D([], [], marker="o", linestyle="none", markersize=2.4,
                               color=POP, label=POPNAME)],
-              loc="upper left", bbox_to_anchor=(0, .03), frameon=False,
+              loc="upper left", bbox_to_anchor=(0, .04), frameon=False,
               fontsize=5.4, handletextpad=.3, borderpad=0, borderaxespad=0)
     ax.set_title("subregions, 8 animals pooled", loc="left", pad=2, x=.04)
 
-    # (b) Galr1 expression across the testable cell types
-    ax = fig.add_subplot(top[1]); panel(ax, "b", dx=-0.52, dy=1.13)
-    expr = screen.sort_values("cpm")
-    ys = np.arange(len(expr))
-    ax.barh(ys, expr.cpm, height=.70,
-            color=[POP if s else "#C4C4C4" for s in expr.significant])
-    ax.set_yticks(ys); ax.set_yticklabels(expr.cell_type, fontsize=5.2)
-    for tick, sig in zip(ax.get_yticklabels(), expr.significant):
+    # (b) adult against aged, in every cell type tested
+    ax = fig.add_subplot(gs[1]); panel(ax, "b", dx=-0.62, dy=1.10)
+    order = screen.sort_values("lfc")
+    ys = np.arange(len(order))
+    for y, name in zip(ys, order.cell_type):
+        vals = per_animal.loc[name]
+        a_mean, g_mean = vals[list(A_ADULT)].mean(), vals[list(A_AGED)].mean()
+        ax.plot([a_mean, g_mean], [y, y], color="#C9C9C9", lw=.9, zorder=1)
+        ax.scatter(vals[list(A_ADULT)], [y] * len(A_ADULT), s=3.5, color=ADULT,
+                   linewidths=0, zorder=2, alpha=.75)
+        ax.scatter(vals[list(A_AGED)], [y] * len(A_AGED), s=3.5, color=C_AGED,
+                   linewidths=0, zorder=2, alpha=.75)
+        ax.scatter([a_mean], [y], s=17, color=ADULT, linewidths=0, zorder=3)
+        ax.scatter([g_mean], [y], s=17, color=C_AGED, linewidths=0, zorder=3)
+    ax.set_yticks(ys)
+    ax.set_yticklabels([f"{n} *" if s else n
+                        for n, s in zip(order.cell_type, order.significant)],
+                       fontsize=5.2)
+    for tick, sig in zip(ax.get_yticklabels(), order.significant):
         tick.set_fontweight("bold" if sig else "normal")
         tick.set_color(POP if sig else INK)
     ax.tick_params(axis="y", length=0)
-    ax.set_xlabel("$\\it{Galr1}$ (log$_2$ CPM)")
-    ax.set_title("expression by cell type", loc="left", pad=2)
+    ax.set_ylim(-.7, len(order) - .3)
+    ax.set_xlim(0, float(per_animal.to_numpy().max()) * 1.06)
+    ax.set_xlabel("$\\it{Galr1}$ (CPM)")
+    # Named in the corner in their own colours rather than in a legend box:
+    # every row carries points, so a box placed anywhere inside sits on data.
+    # Placed against the rows whose points sit at low CPM, so the words land on
+    # empty axis rather than on data or on panel c's row labels.
+    for y, label, colour in ((.46, "aged", C_AGED), (.39, "adult", ADULT)):
+        ax.annotate(label, xy=(.97, y), xycoords="axes fraction", fontsize=5.8,
+                    color=colour, fontweight="bold", ha="right", va="top")
+    ax.set_title("adult vs aged, per cell type", loc="left", pad=2)
 
-    # (c) the age effect per block, clustered
-    ax = fig.add_subplot(top[2]); panel(ax, "c", dx=-0.46, dy=1.13)
-    block_cols = [f"lfc_{b}" for b in BLOCKS]
-    hm = screen.set_index("cell_type")[block_cols]
-    link = optimal_leaf_ordering(linkage(hm.to_numpy(), "average"),
-                                 pdist(hm.to_numpy()))
-    hm = hm.iloc[leaves_list(link)]
-    lim = float(np.abs(hm.to_numpy()).max())
-    im = ax.imshow(hm.to_numpy(), aspect="auto", cmap=LFC_CMAP,
+    # (c) the same data, per animal
+    ax = fig.add_subplot(gs[2]); panel(ax, "c", dx=-0.60, dy=1.10)
+    z = per_animal.sub(per_animal.mean(axis=1), axis=0).div(
+        per_animal.std(axis=1).replace(0, np.nan), axis=0)
+    link = optimal_leaf_ordering(linkage(z.to_numpy(), "average"), pdist(z.to_numpy()))
+    z = z.iloc[leaves_list(link)]
+    lim = float(np.nanmax(np.abs(z.to_numpy())))
+    im = ax.imshow(z.to_numpy(), aspect="auto", cmap=LFC_CMAP,
                    norm=TwoSlopeNorm(vmin=-lim, vcenter=0, vmax=lim))
-    ax.set_xticks(range(len(block_cols)))
-    ax.set_xticklabels([b for b in BLOCKS], fontsize=5.6)
-    ax.set_xlabel("animal pair (block)")
-    sig = screen.set_index("cell_type").significant.reindex(hm.index)
-    ax.set_yticks(range(len(hm)))
-    ax.set_yticklabels([f"{n} *" if s else n for n, s in zip(hm.index, sig)],
+    ax.axvline(len(A_ADULT) - .5, color="white", lw=1.4)
+    ax.set_xticks(range(len(ANIMALS)))
+    ax.set_xticklabels(ANIMALS, fontsize=4.8, rotation=90)
+    for x, label in ((len(A_ADULT) / 2 - .5, "adult"),
+                     (len(A_ADULT) + len(A_AGED) / 2 - .5, "aged")):
+        ax.annotate(label, xy=(x, -.85), xycoords=("data", "data"), fontsize=5.6,
+                    ha="center", va="bottom", color=INK, annotation_clip=False)
+    sig = screen.set_index("cell_type").significant.reindex(z.index)
+    ax.set_yticks(range(len(z)))
+    ax.set_yticklabels([f"{n} *" if s else n for n, s in zip(z.index, sig)],
                        fontsize=5.2)
-    for tick, s in zip(ax.get_yticklabels(), sig):
-        tick.set_fontweight("bold" if s else "normal")
-        tick.set_color(POP if s else INK)
+    for tick, s_ in zip(ax.get_yticklabels(), sig):
+        tick.set_fontweight("bold" if s_ else "normal")
+        tick.set_color(POP if s_ else INK)
     ax.tick_params(axis="both", length=0)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    cb = fig.colorbar(im, ax=ax, fraction=.055, pad=.04)
+    cb = fig.colorbar(im, ax=ax, fraction=.05, pad=.03)
     cb.ax.tick_params(labelsize=5.2, length=1.5)
-    cb.set_label("$\\it{Galr1}$ aged − adult (log$_2$)", fontsize=5.6)
+    cb.set_label("$\\it{Galr1}$ (z across animals)", fontsize=5.6)
     cb.outline.set_visible(False)
-    ax.set_title("* all 4 blocks, $P$ ≤ 0.05", loc="left", pad=2)
+    # Pad clears the adult/aged group labels drawn above the columns.
+    ax.set_title("* changes with age", loc="left", pad=17)
 
-    # (d) the same cells in expression space
-    ax = fig.add_subplot(bot[0]); panel(ax, "d", dx=-0.10)
-    ref = sc.read_h5ad(PROC / "mbh_roi_annotated.h5ad")
-    umap = ref.obsm["X_umap"]
-    ref_types = ref.obs["cell_type"].astype(str).to_numpy()
-    pop_u = ref_types == POPNAME
-    ax.scatter(umap[~pop_u, 0], umap[~pop_u, 1], s=.6, c=TISSUE, linewidths=0,
-               rasterized=True)
-    ax.scatter(umap[pop_u, 0], umap[pop_u, 1], s=2.4, c=POP, linewidths=0,
-               rasterized=True)
-    ax.annotate(POPNAME, (np.median(umap[pop_u, 0]), np.median(umap[pop_u, 1])),
-                xytext=(0, 16), textcoords="offset points", fontsize=5.6,
-                color=POP, fontweight="bold", ha="center",
-                arrowprops=dict(arrowstyle="-", color=POP, lw=.5))
-    ax.set_aspect("equal"); bare(ax)
-    # Said plainly on the panel: this is the reference clustering, which is the
-    # four hand-drawn ROI sections, not the eight the rest of the figure uses.
-    ax.annotate(f"{ref.n_obs:,} cells, {ref.obs['section'].nunique()} ROI sections",
-                xy=(.02, .02), xycoords="axes fraction",
-                fontsize=5.4, color=INK, ha="left", va="bottom")
-    ax.set_title("UMAP", loc="left", pad=2)
-    del ref
+    # (d) the cell type that changes
+    ax = fig.add_subplot(gs[3]); panel(ax, "d", dx=-0.70, dy=1.10)
+    r = pop_stats.loc["Galr1"]
+    paired_panel(ax, pop_cpm["Galr1"].to_dict(), "$\\it{Galr1}$ (CPM)", POPNAME)
+    ax.title.set_color(POP)
+    ax.title.set_fontweight("bold")
+    ax.annotate(f"{2 ** r.lfc:.2f}×\n$P$ = {r.p:.3f}", xy=(.04, .98),
+                xycoords="axes fraction", fontsize=6, color=INK, ha="left",
+                va="top", linespacing=1.4)
 
-    # (e) HypoMap correspondence
-    ax = fig.add_subplot(bot[1]); panel(ax, "e", dx=-0.44)
-    hmap = pd.read_csv(HYPOMAP, index_col=0)
-    best = hmap[POPNAME].sort_values(ascending=False).head(HYPOMAP_SHOWN)[::-1]
-    names = [i.split(": ", 1)[-1] for i in best.index]
-    ax.barh(range(len(best)), best.values, height=.70,
-            color=["#C4C4C4"] * (len(best) - 1) + [POP])
-    ax.set_yticks(range(len(best))); ax.set_yticklabels(names, fontsize=5.4)
-    ax.get_yticklabels()[-1].set_fontweight("bold")
-    ax.get_yticklabels()[-1].set_color(POP)
-    ax.tick_params(axis="y", length=0)
-    ax.set_xlim(.6, float(best.max()) * 1.06)
-    ax.set_xlabel("Spearman ρ to HypoMap C185")
-    ax.set_title("HypoMap identity", loc="left", pad=2)
-
-    # (f, g) the receptors in that population
-    for j, gene in enumerate(MAIN_GENES):
-        ax = fig.add_subplot(bot[j + 2]); panel(ax, "fg"[j], dx=-0.46)
-        r = stats.loc[gene]
-        paired_panel(ax, frac[gene].to_dict(), f"$\\it{{{gene}}}$ (CPM)",
-                     f"{2 ** r.lfc:.2f}×  $P$ = {r.p:.3f}")
-
-    fig.savefig(OUT / "figure_main.pdf")
-    fig.savefig(OUT / "figure_main.png")
+    fig.savefig(OUT / "figure1_screen.pdf")
+    fig.savefig(OUT / "figure1_screen.png")
     plt.close(fig)
 
-    print(f"{int(is_pop.sum())} {POPNAME} neurons across 8 animals")
-    for g in KEY_GENES:
-        if g in stats.index:
-            r = stats.loc[g]
-            print(f"  {g:6s} {2 ** r.lfc:.2f}x  blocks {int(r.blocks)}/4  P {r.p:.4f}")
-
-    print(f"\nGalr1 screen: {len(screen)} cell types tested "
+    print(f"Galr1 screen: {len(screen)} cell types tested "
           f"(>= {MIN_CELLS_PER_ANIMAL} cells in every animal, "
           f">= {MIN_PCT_POS:.0f}% of cells positive)")
     with pd.option_context("display.width", 200):
         print(screen[["cell_type", "n_cells", "pct_pos", "cpm", "fold", "blocks",
                       "p", "margin", "significant"]].to_string(index=False))
-    print(f"\nsignificant: {list(screen[screen.significant].cell_type)}")
+    print(f"\nchanges with age: {list(screen[screen.significant].cell_type)}")
     print(f"\nexcluded before testing ({len(excluded)}):")
     for name, why in excluded:
         print(f"   {name:28s} {why}")
-    print(f"\nwrote {OUT / 'figure_main.pdf'} (+ .png)")
+    print(f"\nwrote {OUT / 'figure1_screen.pdf'} (+ .png)")
     return 0
 
 
