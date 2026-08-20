@@ -7,8 +7,10 @@ Single biological conclusion the figure supports:
     Ghrh+, Ghsr+, Galr3+ -- upregulates Galr1 with age, without loss of neurons.
 
 Panels:
-  a  where the neurons are: one intact section, then every neuron of this type
-     from all eight animals in the shared anatomical frame
+  a  where the neurons can be placed: the registered subregions, every cell
+     from all eight animals pooled in the shared anatomical frame.  This is not
+     a section -- panel b is the section
+  b  one representative section, with every neuron of this type on it
   c  which subregion they belong to: enrichment over the whole window, DMH
      highest
   d  what they are, matched against HypoMap at the C185 level
@@ -24,6 +26,15 @@ Choices made by rule rather than by eye:
     and right of the midline; a torn or folded section scores low.  Restricting
     that test to the analysed window is not enough -- a section can be perfectly
     symmetric inside the window and badly damaged outside it.
+  * panel a paints the subregions largest first.  Eight sections are pooled into
+    one frame, so cells from different animals share pixels and whichever region
+    is drawn last takes them.  In the order the colour table happens to list
+    them, the DMH (9 707 cells in the window) was painted over by its three
+    larger neighbours -- LHA 28 530, ZI 13 532, DHA_PH 10 648, all drawn after
+    it -- so it lost pixels at exactly the borders the parcellation is least
+    sure of, and the nucleus panel c makes a claim about read as smaller than
+    the assignment behind that claim.  Size order is a rule that applies to
+    every region rather than a thumb on the scale for this one.
 
 Adult is plotted first throughout, as the reference condition.  Fos falls
 steeply in these neurons in aged mice, but these animals are untreated, so
@@ -159,12 +170,14 @@ def main() -> int:
         m = nuc == key
         if m.any():
             ax.scatter(ml[m], dv[m], s=.45, c=TISSUE, linewidths=0, rasterized=True)
-    for key in NUCLEUS_LABEL:
+    present = [k for k in NUCLEUS_LABEL if (nuc == k).any()]
+    # Largest first, so no region is hidden by a bigger one drawn after it.
+    for key in sorted(present, key=lambda k: int((nuc == k).sum()), reverse=True):
         m = nuc == key
-        if not m.any():
-            continue
         ax.scatter(ml[m], dv[m], s=.45, c=NUCLEUS_COLOUR[key], linewidths=0,
                    rasterized=True)
+    for key in present:
+        m = nuc == key
         # Direct label on the right-hand side of the bilateral structure, so the
         # map is readable without a colour key.
         side = ml[m] > 0 if (ml[m] > 0).sum() > 30 else ml[m] < 0
@@ -262,6 +275,14 @@ def main() -> int:
     print("whole-section bilateral balance (1.0 = symmetric):")
     for s, v in sorted(balance.items(), key=lambda kv: -kv[1]):
         print(f"   {s:8s} {v:.3f}{'   <- shown' if s == rep else ''}")
+    print("\nsubregions drawn in panel a (pooled over the eight sections):")
+    for key in sorted(present, key=lambda k: int((nuc == k).sum()), reverse=True):
+        m = nuc == key
+        a_ml, d = np.abs(ml[m]), dv[m]
+        print(f"   {key:7s} {int(m.sum()):6d} cells   "
+              f"|ml| {np.percentile(a_ml, 5):4.0f}-{np.percentile(a_ml, 95):4.0f}"
+              f"   dv {np.percentile(d, 5):4.0f}-{np.percentile(d, 95):4.0f} um")
+
     print(f"\n{int(is_pop.sum())} neurons across 8 animals")
     for g in KEY_GENES:
         if g in stats.index:
