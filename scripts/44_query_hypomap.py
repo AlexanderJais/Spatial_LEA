@@ -224,13 +224,21 @@ def main() -> int:
 
     pd.concat(all_hits).to_csv(args.out / "hypomap_best_matches.csv", index=False)
 
-    # Where does HypoMap put Galr1 and Gal?
-    finest = levels[-1]
+    # Where does HypoMap put Galr1 and Gal?  Reported at C185, the level that
+    # is interpretable as neuron types; the finer levels split the same
+    # populations further without adding an identity a reader can use.
+    finest = next((l for l in levels if l.startswith("C185")), levels[-1])
     means = cluster_means(hm, finest,
                           [g for g in ("Galr1", "Gal", "Galr3")
                            if g.lower() in have], symbols)
-    print(f"=== Highest Galr1 clusters in HypoMap ({finest}) ===")
-    print(means.sort_values("Galr1", ascending=False).head(12).round(3).to_string())
+    print(f"=== Galr1 and Gal across HypoMap {finest} ===")
+    ranked = means.sort_values("Galr1", ascending=False)
+    print("  highest Galr1:")
+    print(ranked.head(10).round(3).to_string())
+    if "Gal" in means.columns:
+        print("\n  highest Gal, for contrast -- the ligand and the receptor are "
+              "carried by different clusters:")
+        print(means.sort_values("Gal", ascending=False).head(10).round(3).to_string())
     means.to_csv(args.out / f"hypomap_{finest}_galanin.csv")
 
     print(f"\nWrote tables to {args.out}")
